@@ -1,0 +1,5 @@
+1. 脏写是绝对不允许的，因为第二次写会阻塞
+2. read committed的consistent读每次都读最新提交; repeatable read以第一次读为基准,但DML操作过的部分读最新
+3. select ... lock in shared mode / select ... for update / update / delete / insert 都会加锁
+   + read committed 不锁gap; repeatable read 锁gap
+4. serializable 可以看做所有的读都加上lock in shared mode

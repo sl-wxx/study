@@ -1,0 +1,35 @@
+* 基本概念
+
+** Exchage
+   The "exchange" receives messages from publisher applications and routes these to "message queues", based on arbitrary criteria, usually message properties or content.
+** message queue
+   The "message queue" stores messages until they can be safely processed by a consuming client application (or multiple applications).
+** Binding
+   The "binding" defines the relationship between a message queue and an exchange and provides the message routing criteria.
+** Routing key
+   A virtual address that an exchange may use to decide how to route a specific message.
+** Connection
+   A network connection, e.g. a TCP/IP socket connection.
+** Channel
+   A bi-directional stream of communications between two AMQP peers. Channels are multiplexed so that a single network connection can carry multiple channels.
+** Client
+   The initiator of an AMQP connection or channel. AMQP is not symmetrical. Clients produce and consume messages while servers queue and route messages.
+** Server/Broker
+   The process that accepts client connections and implements the AMQP message queueing and routing functions. Also known as "broker".
+** Frame
+   A formally-defined package of connection data. Frames are always written and read contiguously - as a single unit - on the connection.
+** Protocol class
+   A collection of AMQP commands (also known as Methods) that deal with a specific type of functionality.
+** Virtual host
+   A collection of exchanges, message queues and associated objects. Virtual hosts are independent server domains that share a common authentication and encryption environment.
+** 
+
+* 架构
+** Functional Layer
+   Basic Transactions Exchanges Message-queues
+** Transport Layer
+   Framing Content Data-representation Error-handling Heart-beating Channels
+
+The power of AMQP comes from our ability to create queues (mailboxes), exchanges (MTA processes),
+and bindings (routing entries), at runtime, and to chain these together in ways that go far beyond a simple
+mapping from "to" address to mailbox name.

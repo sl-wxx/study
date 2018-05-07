@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>spring-security</title>
+<!-- 2017-11-12 Sun 19:31 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="root" />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  pre.src-sh:before    { content: 'sh'; }
+  pre.src-bash:before  { content: 'sh'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-R:before     { content: 'R'; }
+  pre.src-perl:before  { content: 'Perl'; }
+  pre.src-java:before  { content: 'Java'; }
+  pre.src-sql:before   { content: 'SQL'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.right  { text-align: center;  }
+  th.left   { text-align: center;   }
+  th.center { text-align: center; }
+  td.right  { text-align: right;  }
+  td.left   { text-align: left;   }
+  td.center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara:nth-child(2) { display: inline; }
+  .footpara { display: block; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  /*]]>*/-->
+</style>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">spring-security</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">1. Authentication</a></li>
+<li><a href="#sec-2">2. Authorization</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1"><span class="section-number-2">1</span> Authentication</h2>
+<div class="outline-text-2" id="text-1">
+<ol class="org-ol">
+<li>SecurityContextHolder 如何维护threadlocal变量? 何时调用setContext? 何时调用clearContext?
+
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #0287c8; font-weight: bold;">Object</span> <span style="color: #4fa8a8;">principal</span> = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+<span style="color: #989848;">if</span> (principal <span style="color: #989848;">instanceof</span> UserDetails) {
+        <span style="color: #0287c8; font-weight: bold;">String</span> <span style="color: #4fa8a8;">username</span> = ((<span style="color: #0287c8; font-weight: bold;">UserDetails</span>)principal).getUsername();
+} <span style="color: #989848;">else</span> {
+        <span style="color: #0287c8; font-weight: bold;">String</span> <span style="color: #4fa8a8;">username</span> = principal.toString();
+}
+</pre>
+</div>
+</li>
+
+<li>UserDetails
+
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">UserDetails</span> <span style="color: #989848;">extends</span> <span style="color: #0287c8; font-weight: bold;">Serializable</span> {
+
+    <span style="color: #0287c8; font-weight: bold;">Collection</span>&lt;? <span style="color: #989848;">extends</span> <span style="color: #0287c8; font-weight: bold;">GrantedAuthority</span>&gt; <span style="color: #424242; font-weight: bold;">getAuthorities</span>();
+
+
+    <span style="color: #0287c8; font-weight: bold;">String</span> <span style="color: #424242; font-weight: bold;">getPassword</span>();
+
+
+    <span style="color: #0287c8; font-weight: bold;">String</span> <span style="color: #424242; font-weight: bold;">getUsername</span>();
+
+
+    <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">isAccountNonExpired</span>();
+
+
+    <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">isAccountNonLocked</span>();
+
+
+    <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">isCredentialsNonExpired</span>();
+
+
+    <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">isEnabled</span>();
+}
+</pre>
+</div>
+</li>
+
+<li>UserDetailsService
+
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">UserDetailsService</span> {
+
+    <span style="color: #0287c8; font-weight: bold;">UserDetails</span> <span style="color: #424242; font-weight: bold;">loadUserByUsername</span>(<span style="color: #0287c8; font-weight: bold;">String</span> <span style="color: #4fa8a8;">username</span>) <span style="color: #989848;">throws</span> <span style="color: #0287c8; font-weight: bold;">UsernameNotFoundException</span>;
+}
+</pre>
+</div>
+
+<div class="org-src-container">
+
+<pre class="src src-xml">&lt;<span style="color: #424242; font-weight: bold;">authentication-manager</span>&gt;
+   &lt;<span style="color: #424242; font-weight: bold;">authentication-provider</span> <span style="color: #4fa8a8;">user-service-ref</span>=<span style="color: #b85c57;">'</span><span style="color: #b85c57;">myUserDetailsService</span><span style="color: #b85c57;">'</span>/&gt;
+&lt;/<span style="color: #424242; font-weight: bold;">authentication-manager</span>&gt;
+</pre>
+</div>
+</li>
+
+<li>Authentication
+
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #40883f;">/**</span>
+<span style="color: #40883f;">    Represents the token for an authentication request or for an authenticated principal once the request has been processed by the AuthenticationManager.authenticate(Authentication) method.</span>
+
+<span style="color: #40883f;">    Once the request has been authenticated, the Authentication will usually be stored in a thread-local SecurityContext managed by the SecurityContextHolder by the authentication mechanism which is being used. </span>
+<span style="color: #40883f;">    An explicit authentication can be achieved, without using one of Spring Security's authentication mechanisms, by creating an Authentication instance and using the code:</span>
+
+<span style="color: #40883f;">    SecurityContextHolder.getContext().setAuthentication(anAuthentication);</span>
+
+<span style="color: #40883f;">    Note that unless the Authentication has the authenticated property set to true, it will still be authenticated by any security interceptor (for method or web invocations) which encounters it.</span>
+<span style="color: #40883f;">    In most cases, the framework transparently takes care of managing the security context and authentication objects for you.</span>
+
+<span style="color: #40883f;">*/</span>
+<span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">Authentication</span> <span style="color: #989848;">extends</span> <span style="color: #0287c8; font-weight: bold;">Principal</span>, <span style="color: #0287c8; font-weight: bold;">Serializable</span> {
+
+    <span style="color: #0287c8; font-weight: bold;">Collection</span>&lt;? <span style="color: #989848;">extends</span> <span style="color: #0287c8; font-weight: bold;">GrantedAuthority</span>&gt; <span style="color: #424242; font-weight: bold;">getAuthorities</span>();
+
+    <span style="color: #40883f;">/* </span><span style="color: #40883f;">This is usually a password, but could be anything relevant to the AuthenticationManager  */</span>
+    <span style="color: #0287c8; font-weight: bold;">Object</span> <span style="color: #424242; font-weight: bold;">getCredentials</span>();
+
+    <span style="color: #40883f;">/* </span><span style="color: #40883f;">Stores additional details about the authentication request. These might be an IP address, certificate serial number etc.  */</span>
+    <span style="color: #0287c8; font-weight: bold;">Object</span> <span style="color: #424242; font-weight: bold;">getDetails</span>();
+
+    <span style="color: #40883f;">/* </span><span style="color: #40883f;">The identity of the principal being authenticated. In the case of an authentication request with username and password, this would be the username.   */</span>
+    <span style="color: #0287c8; font-weight: bold;">Object</span> <span style="color: #424242; font-weight: bold;">getPrincipal</span>();
+
+
+    <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">isAuthenticated</span>();
+
+
+    <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">setAuthenticated</span>(<span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #4fa8a8;">isAuthenticated</span>) <span style="color: #989848;">throws</span> <span style="color: #0287c8; font-weight: bold;">IllegalArgumentException</span>;
+}
+</pre>
+</div>
+</li>
+
+<li>GrantedAuthority
+
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #40883f;">/**</span>
+<span style="color: #40883f;">   A GrantedAuthority is, not surprisingly, an authority that is granted to the principal. Such authorities are usually "roles", such as ROLE_ADMINISTRATOR or ROLE_HR_SUPERVISOR. </span>
+<span style="color: #40883f;">   These roles are later on configured for web authorization, method authorization and domain object authorization. </span>
+<span style="color: #40883f;">   Other parts of Spring Security are capable of interpreting these authorities, and expect them to be present. GrantedAuthority objects are usually loaded by the UserDetailsService.</span>
+<span style="color: #40883f;">*/</span>
+   <span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">GrantedAuthority</span> <span style="color: #989848;">extends</span> <span style="color: #0287c8; font-weight: bold;">Serializable</span> {
+
+       <span style="color: #0287c8; font-weight: bold;">String</span> <span style="color: #424242; font-weight: bold;">getAuthority</span>();
+   }
+</pre>
+</div>
+</li>
+
+<li>AuthenticationManager
+
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">AuthenticationManager</span> {
+
+    <span style="color: #40883f;">/**</span>
+<span style="color: #40883f;">     Attempts to authenticate the passed Authentication object, returning a fully populated Authentication object (including granted authorities) if successful.</span>
+<span style="color: #40883f;">     */</span>
+    <span style="color: #0287c8; font-weight: bold;">Authentication</span> <span style="color: #424242; font-weight: bold;">authenticate</span>(<span style="color: #0287c8; font-weight: bold;">Authentication</span> <span style="color: #4fa8a8;">authentication</span>) <span style="color: #989848;">throws</span> <span style="color: #0287c8; font-weight: bold;">AuthenticationException</span>;
+}
+</pre>
+</div>
+</li>
+
+<li>ExceptionTranslationFilter 默认的filterChain包含哪些filter? 顺序如何?
+
+<pre class="example">
+ExceptionTranslationFilter is a Spring Security filter that has responsibility for detecting any Spring Security exceptions that are thrown. 
+Such exceptions will generally be thrown by an AbstractSecurityInterceptor, which is the main provider of authorization services. 
+It handle these exceptions by either returning error code 403 or launching an AuthenticationEntryPoint.
+</pre>
+</li>
+
+<li>AuthenticationEntryPoint
+
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848;">public</span> <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">commence</span>(<span style="color: #0287c8; font-weight: bold;">HttpServletRequest</span> <span style="color: #4fa8a8;">request</span>, <span style="color: #0287c8; font-weight: bold;">HttpServletResponse</span> <span style="color: #4fa8a8;">response</span>, <span style="color: #0287c8; font-weight: bold;">AuthenticationException</span> <span style="color: #4fa8a8;">authException</span>)
+        <span style="color: #989848;">throws</span> <span style="color: #0287c8; font-weight: bold;">IOException</span>, <span style="color: #0287c8; font-weight: bold;">ServletException</span> {
+    response.addHeader(<span style="color: #b85c57;">"WWW-Authenticate"</span>, <span style="color: #b85c57;">"Basic realm=\""</span> + realmName + <span style="color: #b85c57;">"\""</span>);
+    response.sendError(<span style="color: #989848; font-weight: bold;">HttpServletResponse</span>.SC_UNAUTHORIZED, authException.getMessage());
+}
+</pre>
+</div>
+</li>
+
+<li>Authentication Mechanism 对应的类是什么?
+
+<pre class="example">
+Once your browser submits your authentication credentials (either as an HTTP form post or HTTP header) there needs to be something on the server that "collects" these authentication details.
+In Spring Security we have a special name for the function of collecting authentication details from a user agent (usually a web browser), referring to it as the "authentication mechanism". 
+Examples are form-base login and Basic authentication. Once the authentication details have been collected from the user agent, 
+an Authentication "request" object is built and then presented to the AuthenticationManager.
+
+After the authentication mechanism receives back the fully-populated Authentication object, it will deem the request valid, put the Authentication into the SecurityContextHolder, 
+and cause the original request to be retried. If, on the other hand, the AuthenticationManager rejected the request, the authentication mechanism will ask the user agent to retry.
+</pre>
+</li>
+
+<li>SecurityContextPersistenceFilter
+
+<pre class="example">
+Depending on the type of application, there may need to be a strategy in place to store the security context between user operations. 
+In a typical web application, a user logs in once and is subsequently identified by their session Id. The server caches the principal information for the duration session. 
+In Spring Security, the responsibility for storing the SecurityContext between requests falls to the SecurityContextPersistenceFilter, 
+which by default stores the context as an HttpSession attribute between HTTP requests. It restores the context to the SecurityContextHolder for each request and, 
+crucially, clears the SecurityContextHolder when the request completes.
+</pre>
+</li>
+</ol>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2"><span class="section-number-2">2</span> Authorization</h2>
+<div class="outline-text-2" id="text-2">
+<ol class="org-ol">
+<li>AccessDecisionManager
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">AccessDecisionManager</span> {
+
+    <span style="color: #40883f;">/**</span>
+<span style="color: #40883f;">     * Resolves an access control decision for the passed parameters.</span>
+<span style="color: #40883f;">     *</span>
+<span style="color: #40883f;">     * </span><span style="color: #989848; font-weight: bold;">@param</span><span style="color: #40883f;"> authentication the caller invoking the method (not null)</span>
+<span style="color: #40883f;">     * </span><span style="color: #989848; font-weight: bold;">@param</span><span style="color: #40883f;"> object the secured object being called</span>
+<span style="color: #40883f;">     * </span><span style="color: #989848; font-weight: bold;">@param</span><span style="color: #40883f;"> configAttributes the configuration attributes associated with the secured object being invoked</span>
+<span style="color: #40883f;">     *</span>
+<span style="color: #40883f;">     * </span><span style="color: #989848; font-weight: bold;">@throws</span><span style="color: #40883f;"> AccessDeniedException if access is denied as the authentication does not hold a required authority or</span>
+<span style="color: #40883f;">     *         ACL privilege</span>
+<span style="color: #40883f;">     * </span><span style="color: #989848; font-weight: bold;">@throws</span><span style="color: #40883f;"> InsufficientAuthenticationException if access is denied as the authentication does not provide a</span>
+<span style="color: #40883f;">     *         sufficient level of trust</span>
+<span style="color: #40883f;">     */</span>
+    <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">decide</span>(<span style="color: #0287c8; font-weight: bold;">Authentication</span> <span style="color: #4fa8a8;">authentication</span>, <span style="color: #0287c8; font-weight: bold;">Object</span> <span style="color: #4fa8a8;">object</span>, <span style="color: #0287c8; font-weight: bold;">Collection</span>&lt;<span style="color: #0287c8; font-weight: bold;">ConfigAttribute</span>&gt; <span style="color: #4fa8a8;">configAttributes</span>)
+        <span style="color: #989848;">throws</span> <span style="color: #0287c8; font-weight: bold;">AccessDeniedException</span>, <span style="color: #0287c8; font-weight: bold;">InsufficientAuthenticationException</span>;
+
+    <span style="color: #40883f;">/**</span>
+<span style="color: #40883f;">       Indicates whether this AccessDecisionManager is able to process authorization requests presented with the passed ConfigAttribute.</span>
+<span style="color: #40883f;">       This allows the AbstractSecurityInterceptor to check every configuration attribute can be consumed by the configured AccessDecisionManager and/or RunAsManager and/or AfterInvocationManager</span>
+<span style="color: #40883f;">     */</span>
+    <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">supports</span>(<span style="color: #0287c8; font-weight: bold;">ConfigAttribute</span> <span style="color: #4fa8a8;">attribute</span>);
+
+    <span style="color: #40883f;">/* </span><span style="color: #40883f;">Indicates whether the AccessDecisionManager implementation is able to provide access control decisions for the indicated secured object type. */</span>
+    <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">supports</span>(<span style="color: #0287c8; font-weight: bold;">Class</span>&lt;?&gt; <span style="color: #4fa8a8;">clazz</span>);
+}
+</pre>
+</div>
+</li>
+
+<li>AbstractSecurityInterceptor
+
+<pre class="example">
+   Each supported secure object type has its own interceptor class, which is a subclass of AbstractSecurityInterceptor. 
+Importantly, by the time the AbstractSecurityInterceptor is called, the SecurityContextHolder will contain a valid Authentication if the principal has been authenticated.
+
+AbstractSecurityInterceptor provides a consistent workflow for handling secure object requests, typically:
+
+1) Look up the "configuration attributes" associated with the present request
+2) Submitting the secure object, current Authentication and configuration attributes to the AccessDecisionManager for an authorization decision
+3) Optionally change the Authentication under which the invocation takes place
+4) Allow the secure object invocation to proceed (assuming access was granted)
+5) Call the AfterInvocationManager if configured, once the invocation has returned. If the invocation raised an exception, the AfterInvocationManager will not be invoked.
+</pre>
+</li>
+
+<li>Configuration Attribute
+
+<pre class="example">
+A "configuration attribute" can be thought of as a String that has special meaning to the classes used by AbstractSecurityInterceptor. 
+They are represented by the interface ConfigAttribute within the framework. They may be simple role names or have more complex meaning, 
+depending on the how sophisticated the AccessDecisionManager implementation is. The AbstractSecurityInterceptor is configured with a SecurityMetadataSource 
+which it uses to look up the attributes for a secure object. Usually this configuration will be hidden from the user. 
+Configuration attributes will be entered as annotations on secured methods or as access attributes on secured URLs. 
+For example, when we saw something like &lt;intercept-url pattern='/secure/**' access='ROLE_A,ROLE_B'/&gt; in the namespace introduction, 
+this is saying that the configuration attributes ROLE_A and ROLE_B apply to web requests matching the given pattern. 
+In practice, with the default AccessDecisionManager configuration, this means that anyone who has a GrantedAuthority matching either of these two attributes will be allowed access. 
+Strictly speaking though, they are just attributes and the interpretation is dependent on the AccessDecisionManager implementation. 
+The use of the prefix ROLE_ is a marker to indicate that these attributes are roles and should be consumed by Spring Security’s RoleVoter. 
+This is only relevant when a voter-based AccessDecisionManager is in use.
+</pre>
+</li>
+
+<li>RunAsManager
+
+<pre class="example">
+Assuming AccessDecisionManager decides to allow the request, the AbstractSecurityInterceptor will normally just proceed with the request. 
+Having said that, on rare occasions users may want to replace the Authentication inside the SecurityContext with a different Authentication, 
+which is handled by the AccessDecisionManager calling a RunAsManager. This might be useful in reasonably unusual situations, 
+such as if a services layer method needs to call a remote system and present a different identity. 
+Because Spring Security automatically propagates security identity from one server to another (assuming you’re using a properly-configured RMI or HttpInvoker remoting protocol client), 
+this may be useful.
+</pre>
+</li>
+
+<li>ProviderManager and AuthenticationProvider
+
+<pre class="example">
+The default implementation in Spring Security is called ProviderManager and rather than handling the authentication request itself, 
+it delegates to a list of configured AuthenticationProviders, each of which is queried in turn to see if it can perform the authentication. 
+Each provider will either throw an exception or return a fully populated Authentication object.
+</pre>
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: root</p>
+<p class="date">Created: 2017-11-12 Sun 19:31</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.5.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

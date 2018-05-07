@@ -1,0 +1,528 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>aop</title>
+<!-- 2018-01-12 Fri 14:54 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="root" />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  pre.src-sh:before    { content: 'sh'; }
+  pre.src-bash:before  { content: 'sh'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-R:before     { content: 'R'; }
+  pre.src-perl:before  { content: 'Perl'; }
+  pre.src-java:before  { content: 'Java'; }
+  pre.src-sql:before   { content: 'SQL'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.right  { text-align: center;  }
+  th.left   { text-align: center;   }
+  th.center { text-align: center; }
+  td.right  { text-align: right;  }
+  td.left   { text-align: left;   }
+  td.center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara:nth-child(2) { display: inline; }
+  .footpara { display: block; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  /*]]>*/-->
+</style>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">aop</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">1. AOP是什么</a></li>
+<li><a href="#sec-2">2. 概念</a></li>
+<li><a href="#sec-3">3. 核心接口</a>
+<ul>
+<li><a href="#sec-3-1">3.1. Pointcut</a></li>
+<li><a href="#sec-3-2">3.2. Advice</a>
+<ul>
+<li><a href="#sec-3-2-1">3.2.1. Around advice</a></li>
+<li><a href="#sec-3-2-2">3.2.2. Before advice</a></li>
+<li><a href="#sec-3-2-3">3.2.3. Throws advice</a></li>
+<li><a href="#sec-3-2-4">3.2.4. After returning advice</a></li>
+<li><a href="#sec-3-2-5">3.2.5. Introduction advice</a></li>
+</ul>
+</li>
+<li><a href="#sec-3-3">3.3. ProxyFactoryBean</a></li>
+<li><a href="#sec-3-4">3.4. ProxyFactory</a></li>
+</ul>
+</li>
+<li><a href="#sec-4">4. 源码分析</a></li>
+<li><a href="#sec-5">5. 注意点</a></li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1"><span class="section-number-2">1</span> AOP是什么</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+以事务为例，在很多业务场景中都会用到事务，但是我们不希望在每个业务Service类中都重复事务相关的代码。
+我们可以自己写一个源码再加工模块，他会扫描所有Service类，并自动在源码中加上事务相关的代码。
+每次打包前，先执行一下这个源码再加工模块，这样就可以实现我们的目标了。
+</p>
+
+<p>
+“源码再加工”有一个专门的名词叫做“元编程”，AOP的本质其实也是源码再加工，它也是元编程的一种。
+其他的比如Eclipse自动生成getter/setter方法也可以看做是元编程。
+</p>
+
+<p>
+下面分析AOP的具体实现。既然是源码再加工，那问题无非是2个: 
+</p>
+<ol class="org-ol">
+<li>在哪里进行再加工
+<ul class="org-ul">
+<li>joinpoint: 可选的再加工位置: spring aop提供的可选位置只有方法调用
+</li>
+<li>pointcut:  如何从可选位置中，选出我们感兴趣的位置
+</li>
+</ul>
+</li>
+<li>如何进行再加工 (是加入事务还是其他的什么?)
+<ul class="org-ul">
+<li>advice:       用于给方法加入额外的代码
+</li>
+<li>introduction: 用于给类加入额外的接口及实现
+</li>
+</ul>
+</li>
+</ol>
+
+<p>
+最后Aspect类似OOP的class，用于将上面提到的概念封装在一起。
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2"><span class="section-number-2">2</span> 概念</h2>
+<div class="outline-text-2" id="text-2">
+<ol class="org-ol">
+<li>Aspect: a modularization of a concern that cuts across multiple classes.
+</li>
+<li>Join point: a point during the execution of a program, such as the execution of a method or the handling
+of an exception. In Spring AOP, a join point always represents a method execution.
+</li>
+<li>Advice: action taken by an aspect at a particular join point. Different types of advice include "around,"
+"before" and "after" advice. Spring model an advice as an interceptor, maintaining a chain of interceptors around the join point.
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848; font-weight: bold;">@Aspect</span>
+<span style="color: #989848;">public</span> <span style="color: #989848;">class</span> <span style="color: #0287c8; font-weight: bold;">AdviceExample</span> {
+
+   <span style="color: #989848; font-weight: bold;">@Around</span>(<span style="color: #b85c57;">"com.xyz.myapp.SystemArchitecture.businessService()"</span>)
+   <span style="color: #989848;">public</span> <span style="color: #0287c8; font-weight: bold;">Object</span> <span style="color: #424242; font-weight: bold;">doBasicProfiling</span>(<span style="color: #0287c8; font-weight: bold;">ProceedingJoinPoint</span> <span style="color: #4fa8a8;">pjp</span>) <span style="color: #989848;">throws</span> <span style="color: #0287c8; font-weight: bold;">Throwable</span> {
+      <span style="color: #40883f;">// </span><span style="color: #40883f;">start stopwatch</span>
+      <span style="color: #0287c8; font-weight: bold;">Object</span> <span style="color: #4fa8a8;">retVal</span> = pjp.proceed();
+      <span style="color: #40883f;">// </span><span style="color: #40883f;">stop stopwatch</span>
+      <span style="color: #989848;">return</span> retVal;
+   }
+
+   <span style="color: #989848; font-weight: bold;">@After</span>(<span style="color: #b85c57;">"com.xyz.myapp.SystemArchitecture.dataAccessOperation()"</span>)
+   <span style="color: #989848;">public</span> <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">doReleaseLock</span>() {
+      <span style="color: #40883f;">// </span><span style="color: #40883f;">...</span>
+   }
+}
+</pre>
+</div>
+</li>
+<li>Pointcut: a predicate that matches join points. Advice is associated with a pointcut expression and
+runs at any join point matched by the pointcut
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848; font-weight: bold;">@Aspect</span>
+<span style="color: #989848;">public</span> <span style="color: #989848;">class</span> <span style="color: #0287c8; font-weight: bold;">SystemArchitecture</span> {
+
+   <span style="color: #989848; font-weight: bold;">@Pointcut</span>(<span style="color: #b85c57;">"within(com.xyz.someapp.web..*)"</span>)
+   <span style="color: #989848;">public</span> <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">inWebLayer</span>() {}
+
+   <span style="color: #989848; font-weight: bold;">@Pointcut</span>(<span style="color: #b85c57;">"within(com.xyz.someapp.service..*)"</span>)
+   <span style="color: #989848;">public</span> <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">inServiceLayer</span>() {}
+
+   <span style="color: #989848; font-weight: bold;">@Pointcut</span>(<span style="color: #b85c57;">"within(com.xyz.someapp.dao..*)"</span>)
+   <span style="color: #989848;">public</span> <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">inDataAccessLayer</span>() {}
+
+   <span style="color: #989848; font-weight: bold;">@Pointcut</span>(<span style="color: #b85c57;">"execution(* com.xyz.someapp..service.*.*(..))"</span>)
+   <span style="color: #989848;">public</span> <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">businessService</span>() {}
+
+   <span style="color: #989848; font-weight: bold;">@Pointcut</span>(<span style="color: #b85c57;">"execution(* com.xyz.someapp.dao.*.*(..))"</span>)
+   <span style="color: #989848;">public</span> <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">dataAccessOperation</span>() {}
+}
+</pre>
+</div>
+</li>
+<li>Introduction: declaring additional methods or fields on behalf of a type. Spring AOP allows you to
+introduce new interfaces (and a corresponding implementation) to any advised object.
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848; font-weight: bold;">@Aspect</span>
+<span style="color: #989848;">public</span> <span style="color: #989848;">class</span> <span style="color: #0287c8; font-weight: bold;">UsageTracking</span> {
+   <span style="color: #989848; font-weight: bold;">@DeclareParents</span>(value=<span style="color: #b85c57;">"com.xzy.myapp.service.*+"</span>, defaultImpl=DefaultUsageTracked.<span style="color: #989848;">class</span>)
+   <span style="color: #989848;">public</span> <span style="color: #989848;">static</span> <span style="color: #0287c8; font-weight: bold;">UsageTracked</span> <span style="color: #4fa8a8;">mixin</span>;
+}
+
+<span style="color: #0287c8; font-weight: bold;">UsageTracked</span> <span style="color: #4fa8a8;">usageTracked</span> = (<span style="color: #0287c8; font-weight: bold;">UsageTracked</span>) context.getBean(<span style="color: #b85c57;">"myService"</span>);
+</pre>
+</div>
+</li>
+<li>Target object: object being advised by one or more aspects. Also referred to as the advised object.
+Since Spring AOP is implemented using runtime proxies, this object will always be a proxied object.
+</li>
+<li>AOP proxy: an object created by the AOP framework in order to implement the aspect contracts
+(advise method executions and so on). In the Spring Framework, an AOP proxy will be a JDK dynamic
+proxy or a CGLIB proxy.
+</li>
+<li>Weaving: linking aspects with other application types or objects to create an advised object. This can
+be done at compile time (using the AspectJ compiler, for example), load time, or at runtime. Spring
+AOP, like other pure Java AOP frameworks, performs weaving at runtime.
+</li>
+<li>Advisor: The concept of "advisors" is brought forward from the AOP support defined in Spring 1.2 and does not
+have a direct equivalent in AspectJ. An advisor is like a small self-contained aspect that has a single
+piece of advice. The advice itself is represented by a bean, and must implement one of the advice
+interfaces described in the section called “Advice types in Spring”. Advisors can take advantage of
+AspectJ pointcut expressions though.
+</li>
+</ol>
+
+<p>
+The concept of join points, matched by pointcuts, is the key to AOP which distinguishes it from
+older technologies offering only interception. Pointcuts enable advice to be targeted independently
+of the Object-Oriented hierarchy.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3" class="outline-2">
+<h2 id="sec-3"><span class="section-number-2">3</span> 核心接口</h2>
+<div class="outline-text-2" id="text-3">
+</div><div id="outline-container-sec-3-1" class="outline-3">
+<h3 id="sec-3-1"><span class="section-number-3">3.1</span> Pointcut</h3>
+<div class="outline-text-3" id="text-3-1">
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">Pointcut</span> {
+
+   <span style="color: #0287c8; font-weight: bold;">ClassFilter</span> <span style="color: #424242; font-weight: bold;">getClassFilter</span>();
+
+   <span style="color: #0287c8; font-weight: bold;">MethodMatcher</span> <span style="color: #424242; font-weight: bold;">getMethodMatcher</span>();
+}
+
+
+<span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">ClassFilter</span> {
+
+   <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">matches</span>(<span style="color: #0287c8; font-weight: bold;">Class</span> <span style="color: #4fa8a8;">clazz</span>);
+
+}
+
+
+<span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">MethodMatcher</span> {
+
+   <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">matches</span>(<span style="color: #0287c8; font-weight: bold;">Method</span> <span style="color: #4fa8a8;">m</span>, <span style="color: #0287c8; font-weight: bold;">Class</span> <span style="color: #4fa8a8;">targetClass</span>);
+
+   <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">isRuntime</span>();
+
+   <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">matches</span>(<span style="color: #0287c8; font-weight: bold;">Method</span> <span style="color: #4fa8a8;">m</span>, <span style="color: #0287c8; font-weight: bold;">Class</span> <span style="color: #4fa8a8;">targetClass</span>, <span style="color: #0287c8; font-weight: bold;">Object</span>[] <span style="color: #4fa8a8;">args</span>);
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-2" class="outline-3">
+<h3 id="sec-3-2"><span class="section-number-3">3.2</span> Advice</h3>
+<div class="outline-text-3" id="text-3-2">
+</div><div id="outline-container-sec-3-2-1" class="outline-4">
+<h4 id="sec-3-2-1"><span class="section-number-4">3.2.1</span> Around advice</h4>
+<div class="outline-text-4" id="text-3-2-1">
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">MethodInterceptor</span> <span style="color: #989848;">extends</span> <span style="color: #0287c8; font-weight: bold;">Interceptor</span> {
+   <span style="color: #0287c8; font-weight: bold;">Object</span> <span style="color: #424242; font-weight: bold;">invoke</span>(<span style="color: #0287c8; font-weight: bold;">MethodInvocation</span> <span style="color: #4fa8a8;">invocation</span>) <span style="color: #989848;">throws</span> <span style="color: #0287c8; font-weight: bold;">Throwable</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-2-2" class="outline-4">
+<h4 id="sec-3-2-2"><span class="section-number-4">3.2.2</span> Before advice</h4>
+<div class="outline-text-4" id="text-3-2-2">
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">MethodBeforeAdvice</span> <span style="color: #989848;">extends</span> <span style="color: #0287c8; font-weight: bold;">BeforeAdvice</span> {
+   <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">before</span>(<span style="color: #0287c8; font-weight: bold;">Method</span> <span style="color: #4fa8a8;">m</span>, <span style="color: #0287c8; font-weight: bold;">Object</span>[] <span style="color: #4fa8a8;">args</span>, <span style="color: #0287c8; font-weight: bold;">Object</span> <span style="color: #4fa8a8;">target</span>) <span style="color: #989848;">throws</span> <span style="color: #0287c8; font-weight: bold;">Throwable</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-2-3" class="outline-4">
+<h4 id="sec-3-2-3"><span class="section-number-4">3.2.3</span> Throws advice</h4>
+<div class="outline-text-4" id="text-3-2-3">
+<p>
+org.springframework.aop.ThrowsAdvice interface does not contain any methods: It is a tag interface identifying that the given object implements
+one or more typed throws advice methods. These should be in the form of:
+</p>
+<pre class="example">
+afterThrowing([Method, args, target], subclassOfThrowable)
+</pre>
+<p>
+Only the last argument is required. The method signatures may have either one or four arguments,
+depending on whether the advice method is interested in the method and arguments.
+</p>
+</div>
+</div>
+<div id="outline-container-sec-3-2-4" class="outline-4">
+<h4 id="sec-3-2-4"><span class="section-number-4">3.2.4</span> After returning advice</h4>
+<div class="outline-text-4" id="text-3-2-4">
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">AfterReturningAdvice</span> <span style="color: #989848;">extends</span> <span style="color: #0287c8; font-weight: bold;">Advice</span> {
+    <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">afterReturning</span>(<span style="color: #0287c8; font-weight: bold;">Object</span> <span style="color: #4fa8a8;">returnValue</span>, <span style="color: #0287c8; font-weight: bold;">Method</span> <span style="color: #4fa8a8;">m</span>, <span style="color: #0287c8; font-weight: bold;">Object</span>[] <span style="color: #4fa8a8;">args</span>, <span style="color: #0287c8; font-weight: bold;">Object</span> <span style="color: #4fa8a8;">target</span>)
+    <span style="color: #989848;">throws</span> <span style="color: #0287c8; font-weight: bold;">Throwable</span>;
+}
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-3-2-5" class="outline-4">
+<h4 id="sec-3-2-5"><span class="section-number-4">3.2.5</span> Introduction advice</h4>
+<div class="outline-text-4" id="text-3-2-5">
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">IntroductionInterceptor</span> <span style="color: #989848;">extends</span> <span style="color: #0287c8; font-weight: bold;">MethodInterceptor</span> {
+    <span style="color: #0287c8; font-weight: bold;">boolean</span> <span style="color: #424242; font-weight: bold;">implementsInterface</span>(<span style="color: #0287c8; font-weight: bold;">Class</span> <span style="color: #4fa8a8;">intf</span>);
+}
+
+<span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">IntroductionAdvisor</span> <span style="color: #989848;">extends</span> <span style="color: #0287c8; font-weight: bold;">Advisor</span>, <span style="color: #0287c8; font-weight: bold;">IntroductionInfo</span> {
+    <span style="color: #0287c8; font-weight: bold;">ClassFilter</span> <span style="color: #424242; font-weight: bold;">getClassFilter</span>();
+    <span style="color: #0287c8; font-weight: bold;">void</span> <span style="color: #424242; font-weight: bold;">validateInterfaces</span>() <span style="color: #989848;">throws</span> <span style="color: #0287c8; font-weight: bold;">IllegalArgumentException</span>;
+}
+
+<span style="color: #989848;">public</span> <span style="color: #989848;">interface</span> <span style="color: #0287c8; font-weight: bold;">IntroductionInfo</span> {
+    <span style="color: #0287c8; font-weight: bold;">Class</span>[] <span style="color: #424242; font-weight: bold;">getInterfaces</span>();
+}
+</pre>
+</div>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-3-3" class="outline-3">
+<h3 id="sec-3-3"><span class="section-number-3">3.3</span> ProxyFactoryBean</h3>
+<div class="outline-text-3" id="text-3-3">
+<div class="org-src-container">
+
+<pre class="src src-xml">&lt;<span style="color: #424242; font-weight: bold;">bean</span> <span style="color: #4fa8a8;">id</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">myAdvisor</span><span style="color: #b85c57;">"</span> <span style="color: #4fa8a8;">class</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">com.mycompany.MyAdvisor</span><span style="color: #b85c57;">"</span>&gt;
+  &lt;<span style="color: #424242; font-weight: bold;">property</span> <span style="color: #4fa8a8;">name</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">someProperty</span><span style="color: #b85c57;">"</span> <span style="color: #4fa8a8;">value</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">Custom string property value</span><span style="color: #b85c57;">"</span>/&gt;
+&lt;/<span style="color: #424242; font-weight: bold;">bean</span>&gt;
+
+&lt;<span style="color: #000000; background-color: #ff00ff; font-weight: bold;">bean</span> <span style="color: #4fa8a8;">id</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">debugInterceptor</span><span style="color: #b85c57;">"</span> <span style="color: #4fa8a8;">class</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">org.springframework.aop.interceptor.DebugInterceptor</span><span style="color: #b85c57;">"</span>/&gt;
+
+&lt;<span style="color: #424242; font-weight: bold;">bean</span> <span style="color: #4fa8a8;">id</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">person</span><span style="color: #b85c57;">"</span> <span style="color: #4fa8a8;">class</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">org.springframework.aop.framework.ProxyFactoryBean</span><span style="color: #b85c57;">"</span>&gt;
+  &lt;<span style="color: #424242; font-weight: bold;">property</span> <span style="color: #4fa8a8;">name</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">proxyInterfaces</span><span style="color: #b85c57;">"</span> <span style="color: #4fa8a8;">value</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">com.mycompany.Person</span><span style="color: #b85c57;">"</span>/&gt;
+  <span style="color: #40883f;">&lt;!--</span><span style="color: #40883f;"> Use inner bean, not local reference to target </span><span style="color: #40883f;">--&gt;</span>
+  &lt;<span style="color: #424242; font-weight: bold;">property</span> <span style="color: #4fa8a8;">name</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">target</span><span style="color: #b85c57;">"</span>&gt;
+    &lt;<span style="color: #424242; font-weight: bold;">bean</span> <span style="color: #4fa8a8;">class</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">com.mycompany.PersonImpl</span><span style="color: #b85c57;">"</span>&gt;
+      &lt;<span style="color: #424242; font-weight: bold;">property</span> <span style="color: #4fa8a8;">name</span>=<span style="color: #b85c57;">"</span><span style="color: #000000; background-color: #ff00ff;">name</span><span style="color: #b85c57;">"</span> <span style="color: #4fa8a8;">value</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">Tony</span><span style="color: #b85c57;">"</span>/&gt;
+      &lt;<span style="color: #424242; font-weight: bold;">property</span> <span style="color: #4fa8a8;">name</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">age</span><span style="color: #b85c57;">"</span> <span style="color: #4fa8a8;">value</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">51</span><span style="color: #b85c57;">"</span>/&gt;
+    &lt;/<span style="color: #424242; font-weight: bold;">bean</span>&gt;
+  &lt;/<span style="color: #424242; font-weight: bold;">property</span>&gt;
+  &lt;<span style="color: #000000; background-color: #ff00ff; font-weight: bold;">property</span> <span style="color: #4fa8a8;">name</span>=<span style="color: #b85c57;">"</span><span style="color: #b85c57;">interceptorNames</span><span style="color: #b85c57;">"</span>&gt;
+    &lt;<span style="color: #424242; font-weight: bold;">list</span>&gt;
+      &lt;<span style="color: #424242; font-weight: bold;">value</span>&gt;myAdvisor&lt;/<span style="color: #424242; font-weight: bold;">value</span>&gt;
+      &lt;<span style="color: #000000; background-color: #ff00ff; font-weight: bold;">value</span>&gt;debugInterceptor&lt;/<span style="color: #424242; font-weight: bold;">value</span>&gt;
+    &lt;/<span style="color: #424242; font-weight: bold;">list</span>&gt;
+  &lt;/<span style="color: #424242; font-weight: bold;">property</span>&gt;
+&lt;/<span style="color: #424242; font-weight: bold;">bean</span>&gt;
+</pre>
+</div>
+
+<p>
+The value can be advisor or advice.If you added an interceptor or other advice type, Spring
+will have wrapped this in an advisor with a pointcut that always returns true. Thus if you added a
+MethodInterceptor, the actual advisor returned will be an DefaultPointcutAdvisor which
+returning your MethodInterceptor and a pointcut that matches all classes and methods.
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-3-4" class="outline-3">
+<h3 id="sec-3-4"><span class="section-number-3">3.4</span> ProxyFactory</h3>
+<div class="outline-text-3" id="text-3-4">
+<div class="org-src-container">
+
+<pre class="src src-java"><span style="color: #0287c8; font-weight: bold;">ProxyFactory</span> <span style="color: #4fa8a8;">factory</span> = <span style="color: #989848;">new</span> <span style="color: #0287c8; font-weight: bold;">ProxyFactory</span>(myBusinessInterfaceImpl);
+factory.addAdvice(myMethodInterceptor);
+factory.addAdvisor(myAdvisor);
+<span style="color: #0287c8; font-weight: bold;">MyBusinessInterface</span> <span style="color: #4fa8a8;">tb</span> = (<span style="color: #0287c8; font-weight: bold;">MyBusinessInterface</span>) factory.getProxy();
+</pre>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-4" class="outline-2">
+<h2 id="sec-4"><span class="section-number-2">4</span> 源码分析</h2>
+<div class="outline-text-2" id="text-4">
+<div class="org-src-container">
+
+<pre class="src src-java">&lt;bean <span style="color: #989848;">class</span>=<span style="color: #b85c57;">"org.springframework.aop.framework.autoproxy.InfrastructureAdvisorAutoProxyCreator"</span>/&gt;
+
+&lt;bean <span style="color: #989848;">class</span>=<span style="color: #b85c57;">"org.springframework.transaction.interceptor.BeanFactoryTransactionAttributeSourceAdvisor"</span>&gt;
+    &lt;property name=<span style="color: #b85c57;">"transactionInterceptor"</span> ref=<span style="color: #b85c57;">"transactionInterceptor"</span>/&gt;
+&lt;/bean&gt;
+
+&lt;bean id=<span style="color: #b85c57;">"transactionInterceptor"</span> <span style="color: #989848;">class</span>=<span style="color: #b85c57;">"org.springframework.transaction.interceptor.TransactionInterceptor"</span>&gt;
+    &lt;property name=<span style="color: #b85c57;">"transactionManager"</span> ref=<span style="color: #b85c57;">"transactionManager"</span>/&gt;
+    &lt;property name=<span style="color: #b85c57;">"transactionAttributeSource"</span>&gt;
+        &lt;bean <span style="color: #989848;">class</span>=<span style="color: #b85c57;">"org.springframework.transaction.annotation.AnnotationTransactionAttributeSource"</span>/&gt;
+    &lt;/property&gt;
+&lt;/bean&gt;
+</pre>
+</div>
+<p>
+InfrastructureAdvisorAutoProxyCreator是一个beanPostProcessor, 他会自动扫描beanFactory里面所有的Advisor
+在postProcessAfterInitialization方法中对bean应用Advisor
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-5" class="outline-2">
+<h2 id="sec-5"><span class="section-number-2">5</span> 注意点</h2>
+<div class="outline-text-2" id="text-5">
+<ol class="org-ol">
+<li>In Spring AOP, it is not possible to have aspects themselves be the target of advice from other
+aspects. The @Aspect annotation on a class marks it as an aspect, and hence excludes it from
+auto-proxying.
+</li>
+<li>Due to the proxy-based nature of Spring’s AOP framework, protected methods are by definition
+not intercepted, neither for JDK proxies (where this isn’t applicable) nor for CGLIB proxies (where
+this is technically possible but not recommendable for AOP purposes). As a consequence, any
+given pointcut will be matched against public methods only!
+</li>
+<li>由于spring-aop基于proxy,所以类内部的方法相互调用不会触发advice
+</li>
+</ol>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: root</p>
+<p class="date">Created: 2018-01-12 Fri 14:54</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.5.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

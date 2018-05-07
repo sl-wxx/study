@@ -1,0 +1,49 @@
+* 工具: Emacs, Eclipse, Git, Maven
+
+* 操作系统
+** Linux: linux from scratch, autotools, shell
+** x86指令集,保护模式,多进程实现
+** 数字电路: 与非门, SR锁存器, 寄存器, 计数器等
+
+* 网络
+** TCP/IP
+** tcpdump
+
+* 数据库
+** 并发控制系统: 可串行化,两阶段锁,锁粒度(共享锁,排它锁,意向锁),多本版控制(MVCC),基于时间戳
+** 索引: 聚簇/非聚簇, B+树, hash索引
+** 查询优化
+
+* Java
+** JVM: GC, ClassLoader
+** 并发: AbstractSynchronizeQueue, ConcurrentHashMap, 内存模型, CPU缓存行, 连接池等
+
+* Web
+** servlet-api
+** tomcat
+
+* Spring: MVC, AOP(元编程), Security
+
+* 分布式
+** Paxos算法
+** hadoop the definition guide
+
+* Javascript
+** jquery
+** javascript the good parts
+
+* erlang
+
+* lisp
+
+
+
+
+
+
+
+* 问题
+
+** 操作系统
+
+*** 具体实现 xx课程可以解决

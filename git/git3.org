@@ -1,0 +1,32 @@
+* 单人单工作流
+我们把修改的文件/修改人/修改时间加上说明信息作为一条修改记录，并用修改内容的hash码命名该记录，
+最后再把这条修改记录保存下来，这样就实现了一个最简单的版本管理工具。我们把修改记录叫做提交(commit),
+并以hash码做为文件名，把每个提交保存在.git/objects/目录下。 按修改时间顺序展示修改历史，如下:
+
+   #+begin_example
+commit c78da36fcc8086805991021a8295de79b3db5543
+Author: liu.shuai <liu.shuai@hejinonline.com>
+Date:   Thu Apr 13 17:27:01 2017 +0800
+
+    修改理赔申请成功的短信模板 && session超时时间
+
+01sit/caf-conf.properties
+02uat/caf-conf.properties
+04prd/caf-conf.properties
+
+commit b7692ab562162af538fa65e23296fdc818bb8e7d
+Author: liu.shuai <liu.shuai@hejinonline.com>
+Date:   Wed Apr 5 18:28:53 2017 +0800
+
+    修改P11目录： APP接收电子病历拍照和电子理赔申请书
+
+01sit/health.properties
+02uat/health.properties
+04prd/health.properties
+   #+end_example
+
+* 单人多工作流
+  上面实现的一个问题是不能很好的支持多工作流，即同时进行多项工作。
+  比如: b7692ab562162af538fa65e23296fdc818bb8e7d对应的内容做了线上发布，但发现了重大bug. 
+  为了修复bug我们
+* 多人多工作流

@@ -1,0 +1,108 @@
+* ContextLoaderListener
+  #+BEGIN_SRC xml
+    <listener>
+        <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+    </listener>
+
+    <context-param>
+        <param-name>contextConfigLocation</param-name>
+        <param-value>
+            classpath*:spring/applicationContext.xml
+            classpath*:spring/spring-security.xml
+        </param-value>
+    </context-param>
+  #+END_SRC
+
+ContextLoaderListener 用于创建root WebApplicationContext
+
+* DispatcherServlet
+  #+BEGIN_SRC xml
+    <servlet>
+        <servlet-name>appServlet</servlet-name>
+        <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+        <init-param>
+            <param-name>contextConfigLocation</param-name>
+            <param-value>classpath*:spring/mvc.xml</param-value>
+        </init-param>
+        <load-on-startup>1</load-on-startup>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>appServlet</servlet-name>
+        <url-pattern>/</url-pattern>
+    </servlet-mapping>
+  #+END_SRC
+
+DispatcherServlet 会在初始化时创建自己的appServlet WebApplicationContext, 并把ContextLoaderListener创建的root WebApplicationContext作为父上下文。
+
+* controller
+  #+BEGIN_SRC xml
+  <context:component-scan base-package="com.shop" annotation-config="true"/>
+  #+END_SRC
+  component-scan会扫描@Component, @Repository, @Service, @Controller
+  设置annotaion-config属性为true会扫描@Required, @Autowired, @PostConstruct, @PreDestroy, @Resource, @PersistenceContext and @PersistenceUnit
+* handler mapping
+  RequestMappingHandlerMapping 用于解析@RequestMapping, 查找请求对应的controller方法
+* HandlerAdaptor
+  RequestMappingHandlerAdapter 用于实际调用controller方法
+* HandlerMethod
+  controller的方法会被封装成HandlerMethod
+
+* view resolver
+  
+
+* handlerExceptionResolver
+  
+
+* HttpMessageConverter
+
+  
+* validator
+
+* command object
+
+* form object
+
+* model object
+
+* Jsonp
+
+* ContentNegotiationManager
+  #+BEGIN_SRC xml
+    <mvc:annotation-driven content-negotiation-manager="contentNegotiationManager" />
+
+    <bean id="contentNegotiationManager" class="org.springframework.web.accept.ContentNegotiationManagerFactoryBean">
+      <property name="favorPathExtension" value="false" />
+      <property name="favorParameter" value="true" />
+      <property name="mediaTypes" >
+        <value>
+          json=application/json
+          xml=application/xml
+        </value>
+      </property>
+    </bean>
+  #+END_SRC
+
+  contentNegotiationManager同时被RequestMappingHandlerMapping和RequestMappingHandlerAdapter和ExceptionHandlerExceptionResolver使用
+
+* http cache support
+  Page 527 ？？？
+
+1. 请求进来 DispatcherServlet --> doService() --> doDispatcher()
+2. 通过预先注册的handlerMappings获取到HandlerExecutionChain(包含handlerMethod和handlerInterceptors)
+3. 根据2中找到的handlerMethod，在预先注册的handlerAdaptors中找到可用的handlerAdaptor
+4. 先执行HandlerExecutionChain中的handlerInterceptors的preHandle方法
+5. 调用3中的handlerAdaptor
+   + 解析请求参数
+6. 
+
+
+
+1. rabbitMQ默认是单线程处理的 为什么？
+2. spring 基于代理的事务 具体如何实现的？
+3. spring 第8章 校验 转换相关
+5. spring 静态资源缓存及版本
+6. servlet api 重新温习
+
+
+
+

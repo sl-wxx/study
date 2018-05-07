@@ -1,0 +1,235 @@
+* AOP是什么
+
+以事务为例，在很多业务场景中都会用到事务，但是我们不希望在每个业务Service类中都重复事务相关的代码。
+我们可以自己写一个源码再加工模块，他会扫描所有Service类，并自动在源码中加上事务相关的代码。
+每次打包前，先执行一下这个源码再加工模块，这样就可以实现我们的目标了。
+
+“源码再加工”有一个专门的名词叫做“元编程”，AOP的本质其实也是源码再加工，它也是元编程的一种。
+其他的比如Eclipse自动生成getter/setter方法也可以看做是元编程。
+
+下面分析AOP的具体实现。既然是源码再加工，那问题无非是2个: 
+1. 在哪里进行再加工
+   - joinpoint: 可选的再加工位置: spring aop提供的可选位置只有方法调用
+   - pointcut:  如何从可选位置中，选出我们感兴趣的位置
+2. 如何进行再加工 (是加入事务还是其他的什么?)
+   - advice:       用于给方法加入额外的代码
+   - introduction: 用于给类加入额外的接口及实现
+
+最后Aspect类似OOP的class，用于将上面提到的概念封装在一起。
+
+* 概念
+1. Aspect: a modularization of a concern that cuts across multiple classes.
+2. Join point: a point during the execution of a program, such as the execution of a method or the handling
+   of an exception. In Spring AOP, a join point always represents a method execution.
+3. Advice: action taken by an aspect at a particular join point. Different types of advice include "around,"
+   "before" and "after" advice. Spring model an advice as an interceptor, maintaining a chain of interceptors around the join point.
+   #+BEGIN_SRC java
+   @Aspect
+   public class AdviceExample {
+      
+      @Around("com.xyz.myapp.SystemArchitecture.businessService()")
+      public Object doBasicProfiling(ProceedingJoinPoint pjp) throws Throwable {
+         // start stopwatch
+         Object retVal = pjp.proceed();
+         // stop stopwatch
+         return retVal;
+      }
+
+      @After("com.xyz.myapp.SystemArchitecture.dataAccessOperation()")
+      public void doReleaseLock() {
+         // ...
+      }
+   }
+   #+END_SRC
+4. Pointcut: a predicate that matches join points. Advice is associated with a pointcut expression and
+   runs at any join point matched by the pointcut
+   #+BEGIN_SRC java
+   @Aspect
+   public class SystemArchitecture {
+
+      @Pointcut("within(com.xyz.someapp.web..*)")
+      public void inWebLayer() {}
+      
+      @Pointcut("within(com.xyz.someapp.service..*)")
+      public void inServiceLayer() {}
+      
+      @Pointcut("within(com.xyz.someapp.dao..*)")
+      public void inDataAccessLayer() {}
+            
+      @Pointcut("execution(* com.xyz.someapp..service.*.*(..))")
+      public void businessService() {}
+      
+      @Pointcut("execution(* com.xyz.someapp.dao.*.*(..))")
+      public void dataAccessOperation() {}
+   }
+   #+END_SRC
+5. Introduction: declaring additional methods or fields on behalf of a type. Spring AOP allows you to
+   introduce new interfaces (and a corresponding implementation) to any advised object.
+   #+BEGIN_SRC java
+   @Aspect
+   public class UsageTracking {
+      @DeclareParents(value="com.xzy.myapp.service.*+", defaultImpl=DefaultUsageTracked.class)
+      public static UsageTracked mixin;
+   }
+
+   UsageTracked usageTracked = (UsageTracked) context.getBean("myService");
+
+   #+END_SRC
+6. Target object: object being advised by one or more aspects. Also referred to as the advised object.
+   Since Spring AOP is implemented using runtime proxies, this object will always be a proxied object.
+7. AOP proxy: an object created by the AOP framework in order to implement the aspect contracts
+   (advise method executions and so on). In the Spring Framework, an AOP proxy will be a JDK dynamic
+   proxy or a CGLIB proxy.
+8. Weaving: linking aspects with other application types or objects to create an advised object. This can
+   be done at compile time (using the AspectJ compiler, for example), load time, or at runtime. Spring
+   AOP, like other pure Java AOP frameworks, performs weaving at runtime.
+9. Advisor: The concept of "advisors" is brought forward from the AOP support defined in Spring 1.2 and does not
+   have a direct equivalent in AspectJ. An advisor is like a small self-contained aspect that has a single
+   piece of advice. The advice itself is represented by a bean, and must implement one of the advice
+   interfaces described in the section called “Advice types in Spring”. Advisors can take advantage of
+   AspectJ pointcut expressions though.
+
+The concept of join points, matched by pointcuts, is the key to AOP which distinguishes it from
+older technologies offering only interception. Pointcuts enable advice to be targeted independently
+of the Object-Oriented hierarchy.
+
+* 核心接口
+** Pointcut
+   #+BEGIN_SRC java
+   public interface Pointcut {
+   
+      ClassFilter getClassFilter();
+   
+      MethodMatcher getMethodMatcher();
+   }
+
+
+   public interface ClassFilter {
+   
+      boolean matches(Class clazz);
+
+   }
+
+   
+   public interface MethodMatcher {
+
+      boolean matches(Method m, Class targetClass);
+
+      boolean isRuntime();
+
+      boolean matches(Method m, Class targetClass, Object[] args);
+   }
+   #+END_SRC
+
+** Advice
+*** Around advice
+   #+BEGIN_SRC java
+   public interface MethodInterceptor extends Interceptor {
+      Object invoke(MethodInvocation invocation) throws Throwable;
+   }
+   #+END_SRC
+*** Before advice
+    #+BEGIN_SRC java
+    public interface MethodBeforeAdvice extends BeforeAdvice {
+       void before(Method m, Object[] args, Object target) throws Throwable;
+    }
+    #+END_SRC
+*** Throws advice
+    org.springframework.aop.ThrowsAdvice interface does not contain any methods: It is a tag interface identifying that the given object implements
+    one or more typed throws advice methods. These should be in the form of:
+    #+BEGIN_SRC 
+        afterThrowing([Method, args, target], subclassOfThrowable)
+    #+END_SRC
+    Only the last argument is required. The method signatures may have either one or four arguments,
+    depending on whether the advice method is interested in the method and arguments.
+*** After returning advice
+    #+BEGIN_SRC java
+    public interface AfterReturningAdvice extends Advice {
+        void afterReturning(Object returnValue, Method m, Object[] args, Object target)
+        throws Throwable;
+    }
+    #+END_SRC
+*** Introduction advice
+    #+BEGIN_SRC java
+    public interface IntroductionInterceptor extends MethodInterceptor {
+        boolean implementsInterface(Class intf);
+    }
+
+    public interface IntroductionAdvisor extends Advisor, IntroductionInfo {
+        ClassFilter getClassFilter();
+        void validateInterfaces() throws IllegalArgumentException;
+    }
+    
+    public interface IntroductionInfo {
+        Class[] getInterfaces();
+    }
+    #+END_SRC
+
+** ProxyFactoryBean
+
+   #+BEGIN_SRC xml
+   <bean id="myAdvisor" class="com.mycompany.MyAdvisor">
+     <property name="someProperty" value="Custom string property value"/>
+   </bean>
+
+   <bean id="debugInterceptor" class="org.springframework.aop.interceptor.DebugInterceptor"/>
+
+   <bean id="person" class="org.springframework.aop.framework.ProxyFactoryBean">
+     <property name="proxyInterfaces" value="com.mycompany.Person"/>
+     <!-- Use inner bean, not local reference to target -->
+     <property name="target">
+       <bean class="com.mycompany.PersonImpl">
+         <property name="name" value="Tony"/>
+         <property name="age" value="51"/>
+       </bean>
+     </property>
+     <property name="interceptorNames">
+       <list>
+         <value>myAdvisor</value>
+         <value>debugInterceptor</value>
+       </list>
+     </property>
+   </bean>
+   #+END_SRC
+
+The value can be advisor or advice.If you added an interceptor or other advice type, Spring
+will have wrapped this in an advisor with a pointcut that always returns true. Thus if you added a
+MethodInterceptor, the actual advisor returned will be an DefaultPointcutAdvisor which
+returning your MethodInterceptor and a pointcut that matches all classes and methods.
+
+** ProxyFactory
+   #+BEGIN_SRC java
+   ProxyFactory factory = new ProxyFactory(myBusinessInterfaceImpl);
+   factory.addAdvice(myMethodInterceptor);
+   factory.addAdvisor(myAdvisor);
+   MyBusinessInterface tb = (MyBusinessInterface) factory.getProxy();
+   #+END_SRC
+* 源码分析
+
+   #+BEGIN_SRC java
+   <bean class="org.springframework.aop.framework.autoproxy.InfrastructureAdvisorAutoProxyCreator"/>
+
+   <bean class="org.springframework.transaction.interceptor.BeanFactoryTransactionAttributeSourceAdvisor">
+       <property name="transactionInterceptor" ref="transactionInterceptor"/>
+   </bean>
+
+   <bean id="transactionInterceptor" class="org.springframework.transaction.interceptor.TransactionInterceptor">
+       <property name="transactionManager" ref="transactionManager"/>
+       <property name="transactionAttributeSource">
+           <bean class="org.springframework.transaction.annotation.AnnotationTransactionAttributeSource"/>
+       </property>
+   </bean>
+   #+END_SRC
+   InfrastructureAdvisorAutoProxyCreator是一个beanPostProcessor, 他会自动扫描beanFactory里面所有的Advisor
+   在postProcessAfterInitialization方法中对bean应用Advisor
+
+* 注意点
+
+1. In Spring AOP, it is not possible to have aspects themselves be the target of advice from other
+   aspects. The @Aspect annotation on a class marks it as an aspect, and hence excludes it from
+   auto-proxying.
+2. Due to the proxy-based nature of Spring’s AOP framework, protected methods are by definition
+   not intercepted, neither for JDK proxies (where this isn’t applicable) nor for CGLIB proxies (where
+   this is technically possible but not recommendable for AOP purposes). As a consequence, any
+   given pointcut will be matched against public methods only!
+3. 由于spring-aop基于proxy,所以类内部的方法相互调用不会触发advice

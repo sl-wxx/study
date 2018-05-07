@@ -1,0 +1,275 @@
+* Authentication
+1. SecurityContextHolder 如何维护threadlocal变量? 何时调用setContext? 何时调用clearContext?
+
+   #+BEGIN_SRC java
+
+   Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+   if (principal instanceof UserDetails) {
+           String username = ((UserDetails)principal).getUsername();
+   } else {
+           String username = principal.toString();
+   }
+
+   #+END_SRC
+
+2. UserDetails
+
+   #+BEGIN_SRC java
+
+   public interface UserDetails extends Serializable {
+       
+       Collection<? extends GrantedAuthority> getAuthorities();
+
+      
+       String getPassword();
+
+       
+       String getUsername();
+
+       
+       boolean isAccountNonExpired();
+
+      
+       boolean isAccountNonLocked();
+
+       
+       boolean isCredentialsNonExpired();
+
+       
+       boolean isEnabled();
+   }
+      
+   #+END_SRC
+
+3. UserDetailsService
+
+   #+BEGIN_SRC java
+
+   public interface UserDetailsService {
+       
+       UserDetails loadUserByUsername(String username) throws UsernameNotFoundException;
+   }
+
+   #+END_SRC
+
+   #+BEGIN_SRC xml
+
+      <authentication-manager>
+         <authentication-provider user-service-ref='myUserDetailsService'/>
+      </authentication-manager>
+
+   #+END_SRC
+
+4. Authentication
+
+   #+BEGIN_SRC java
+
+   /**
+       Represents the token for an authentication request or for an authenticated principal once the request has been processed by the AuthenticationManager.authenticate(Authentication) method.
+
+       Once the request has been authenticated, the Authentication will usually be stored in a thread-local SecurityContext managed by the SecurityContextHolder by the authentication mechanism which is being used. 
+       An explicit authentication can be achieved, without using one of Spring Security's authentication mechanisms, by creating an Authentication instance and using the code:
+
+       SecurityContextHolder.getContext().setAuthentication(anAuthentication);
+    
+       Note that unless the Authentication has the authenticated property set to true, it will still be authenticated by any security interceptor (for method or web invocations) which encounters it.
+       In most cases, the framework transparently takes care of managing the security context and authentication objects for you.
+
+   ,*/
+   public interface Authentication extends Principal, Serializable {
+
+       Collection<? extends GrantedAuthority> getAuthorities();
+
+       /* This is usually a password, but could be anything relevant to the AuthenticationManager  */
+       Object getCredentials();
+
+       /* Stores additional details about the authentication request. These might be an IP address, certificate serial number etc.  */
+       Object getDetails();
+
+       /* The identity of the principal being authenticated. In the case of an authentication request with username and password, this would be the username.   */
+       Object getPrincipal();
+
+
+       boolean isAuthenticated();
+
+
+       void setAuthenticated(boolean isAuthenticated) throws IllegalArgumentException;
+   }
+      
+   #+END_SRC
+
+5. GrantedAuthority
+
+   #+BEGIN_SRC java
+
+   /**
+      A GrantedAuthority is, not surprisingly, an authority that is granted to the principal. Such authorities are usually "roles", such as ROLE_ADMINISTRATOR or ROLE_HR_SUPERVISOR. 
+      These roles are later on configured for web authorization, method authorization and domain object authorization. 
+      Other parts of Spring Security are capable of interpreting these authorities, and expect them to be present. GrantedAuthority objects are usually loaded by the UserDetailsService.
+   ,*/
+      public interface GrantedAuthority extends Serializable {
+
+          String getAuthority();
+      }
+         
+   #+END_SRC
+
+6. AuthenticationManager
+   
+   #+BEGIN_SRC java
+
+   public interface AuthenticationManager {
+      
+       /**
+        Attempts to authenticate the passed Authentication object, returning a fully populated Authentication object (including granted authorities) if successful.
+        ,*/
+       Authentication authenticate(Authentication authentication) throws AuthenticationException;
+   }
+      
+   #+END_SRC
+
+7. ExceptionTranslationFilter 默认的filterChain包含哪些filter? 顺序如何?
+   
+   #+begin_example
+
+   ExceptionTranslationFilter is a Spring Security filter that has responsibility for detecting any Spring Security exceptions that are thrown. 
+   Such exceptions will generally be thrown by an AbstractSecurityInterceptor, which is the main provider of authorization services. 
+   It handle these exceptions by either returning error code 403 or launching an AuthenticationEntryPoint.
+
+   #+end_example
+
+8. AuthenticationEntryPoint
+
+   #+BEGIN_SRC java
+
+       public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException)
+               throws IOException, ServletException {
+           response.addHeader("WWW-Authenticate", "Basic realm=\"" + realmName + "\"");
+           response.sendError(HttpServletResponse.SC_UNAUTHORIZED, authException.getMessage());
+       }
+      
+   #+END_SRC
+
+9. Authentication Mechanism 对应的类是什么?
+
+   #+begin_example
+   
+   Once your browser submits your authentication credentials (either as an HTTP form post or HTTP header) there needs to be something on the server that "collects" these authentication details.
+   In Spring Security we have a special name for the function of collecting authentication details from a user agent (usually a web browser), referring to it as the "authentication mechanism". 
+   Examples are form-base login and Basic authentication. Once the authentication details have been collected from the user agent, 
+   an Authentication "request" object is built and then presented to the AuthenticationManager.
+
+   After the authentication mechanism receives back the fully-populated Authentication object, it will deem the request valid, put the Authentication into the SecurityContextHolder, 
+   and cause the original request to be retried. If, on the other hand, the AuthenticationManager rejected the request, the authentication mechanism will ask the user agent to retry.
+
+   #+end_example
+
+10. SecurityContextPersistenceFilter
+
+    #+begin_example
+
+    Depending on the type of application, there may need to be a strategy in place to store the security context between user operations. 
+    In a typical web application, a user logs in once and is subsequently identified by their session Id. The server caches the principal information for the duration session. 
+    In Spring Security, the responsibility for storing the SecurityContext between requests falls to the SecurityContextPersistenceFilter, 
+    which by default stores the context as an HttpSession attribute between HTTP requests. It restores the context to the SecurityContextHolder for each request and, 
+    crucially, clears the SecurityContextHolder when the request completes.  
+
+    #+end_example
+
+* Authorization
+
+1. AccessDecisionManager
+   #+BEGIN_SRC java
+
+   public interface AccessDecisionManager {
+
+       /**
+        ,* Resolves an access control decision for the passed parameters.
+        ,*
+        ,* @param authentication the caller invoking the method (not null)
+        ,* @param object the secured object being called
+        ,* @param configAttributes the configuration attributes associated with the secured object being invoked
+        ,*
+        ,* @throws AccessDeniedException if access is denied as the authentication does not hold a required authority or
+        ,*         ACL privilege
+        ,* @throws InsufficientAuthenticationException if access is denied as the authentication does not provide a
+        ,*         sufficient level of trust
+        ,*/
+       void decide(Authentication authentication, Object object, Collection<ConfigAttribute> configAttributes)
+           throws AccessDeniedException, InsufficientAuthenticationException;
+
+       /**
+          Indicates whether this AccessDecisionManager is able to process authorization requests presented with the passed ConfigAttribute.
+          This allows the AbstractSecurityInterceptor to check every configuration attribute can be consumed by the configured AccessDecisionManager and/or RunAsManager and/or AfterInvocationManager
+        ,*/
+       boolean supports(ConfigAttribute attribute);
+
+       /* Indicates whether the AccessDecisionManager implementation is able to provide access control decisions for the indicated secured object type. */
+       boolean supports(Class<?> clazz);
+   }
+      
+   #+END_SRC
+
+2. AbstractSecurityInterceptor
+   
+   #+begin_example
+
+      Each supported secure object type has its own interceptor class, which is a subclass of AbstractSecurityInterceptor. 
+   Importantly, by the time the AbstractSecurityInterceptor is called, the SecurityContextHolder will contain a valid Authentication if the principal has been authenticated.
+
+   AbstractSecurityInterceptor provides a consistent workflow for handling secure object requests, typically:
+
+   1) Look up the "configuration attributes" associated with the present request
+   2) Submitting the secure object, current Authentication and configuration attributes to the AccessDecisionManager for an authorization decision
+   3) Optionally change the Authentication under which the invocation takes place
+   4) Allow the secure object invocation to proceed (assuming access was granted)
+   5) Call the AfterInvocationManager if configured, once the invocation has returned. If the invocation raised an exception, the AfterInvocationManager will not be invoked.
+
+
+    #+end_example
+
+3. Configuration Attribute
+
+   #+begin_example
+
+   A "configuration attribute" can be thought of as a String that has special meaning to the classes used by AbstractSecurityInterceptor. 
+   They are represented by the interface ConfigAttribute within the framework. They may be simple role names or have more complex meaning, 
+   depending on the how sophisticated the AccessDecisionManager implementation is. The AbstractSecurityInterceptor is configured with a SecurityMetadataSource 
+   which it uses to look up the attributes for a secure object. Usually this configuration will be hidden from the user. 
+   Configuration attributes will be entered as annotations on secured methods or as access attributes on secured URLs. 
+   For example, when we saw something like <intercept-url pattern='/secure/**' access='ROLE_A,ROLE_B'/> in the namespace introduction, 
+   this is saying that the configuration attributes ROLE_A and ROLE_B apply to web requests matching the given pattern. 
+   In practice, with the default AccessDecisionManager configuration, this means that anyone who has a GrantedAuthority matching either of these two attributes will be allowed access. 
+   Strictly speaking though, they are just attributes and the interpretation is dependent on the AccessDecisionManager implementation. 
+   The use of the prefix ROLE_ is a marker to indicate that these attributes are roles and should be consumed by Spring Security’s RoleVoter. 
+   This is only relevant when a voter-based AccessDecisionManager is in use.
+
+   #+end_example
+
+4. RunAsManager
+
+   #+begin_example
+
+   Assuming AccessDecisionManager decides to allow the request, the AbstractSecurityInterceptor will normally just proceed with the request. 
+   Having said that, on rare occasions users may want to replace the Authentication inside the SecurityContext with a different Authentication, 
+   which is handled by the AccessDecisionManager calling a RunAsManager. This might be useful in reasonably unusual situations, 
+   such as if a services layer method needs to call a remote system and present a different identity. 
+   Because Spring Security automatically propagates security identity from one server to another (assuming you’re using a properly-configured RMI or HttpInvoker remoting protocol client), 
+   this may be useful.
+
+   #+end_example
+
+5. ProviderManager and AuthenticationProvider
+
+   #+begin_example
+
+   The default implementation in Spring Security is called ProviderManager and rather than handling the authentication request itself, 
+   it delegates to a list of configured AuthenticationProviders, each of which is queried in turn to see if it can perform the authentication. 
+   Each provider will either throw an exception or return a fully populated Authentication object. 
+
+   #+end_example
+
+
+
+

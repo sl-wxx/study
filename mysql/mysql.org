@@ -1,0 +1,65 @@
+1. select current_date, now(), user(), version(), database();
+2. In MySQL, 0 or NULL means false and anything else means true.
+3. select s1.* from shop s1 left join shop s2 on s1.price < s2.price and s2.price is null;
+4. select s1.* from shop s1 left join shop s2 on s1.article=s2.article and s1.price < s2.price where s2.price is null;
+5. SELECT @min_price:=MIN(price),@max_price:=MAX(price) FROM shop;
+6. mysql --print-defaults
+7. mysqld --verbose --help
+8. mysqladmin -uroot -p variables/extended-status
+9. show variables/status;
+10. When tuning a MySQL server, the two most important variables to configure are key_buffer_size and table_open_cache.
+11. select * from information_schema.plugin\G
+12. mysql enterprise pool
+    MySQL Enterprise Edition includes MySQL Enterprise Thread Pool, implemented using a server plugin. The default thread-handling model in MySQL Server executes statements using one thread per client connection.The thread pool consists of a number of thread groups, each of which manages a set of client connections. As connections are established, the thread pool assigns them to thread groups in round-robin fashion.The number of thread groups is configurable using the thread_pool_size system variable. The default number of groups is 16. The maximum number of threads per group is 4096 (or 4095 on some systems where one thread is used internally).
+
+* Optimizing
+1. applications that perform frequent updates often have many tables with few columns, while applications that analyze large amounts of data often have few tables with many columns.
+2. build right index
+3. 尽量不要写select *
+4. 常见优化
+   varchar和char长度相同时，认为是匹配类型; int 和 string不是匹配类型
+5. explain
+   - extra:
+     + using index: 查询没有用到索引之外的列
+     + using index condition: index push down used
+   - rows: 使用索引定位到的记录条数
+   - filtered: 索引定位到的条数范围内, 满足其他where条件的百分比
+   - filesort: 没有可用索引的排序
+   - using_index_for_group_by: 查询只用到多列索引的一部分
+   - 
+
+问题: 
+1. 根据直方图分析filtered
+
+2. select emp_no from lary where salary>60000 group by emp_no limit 50000,10; 
+   select salary from lary where salary>60000 group by salary limit 50000,10;
+   emp_no 有索引反而更慢 
+   select emp_no from lary ignore index (idx_emp_date) where salary>60000 group by emp_no limit 50000,10;
+
+3. select * from lary where emp_no in (select emp_no from lary) limit ....;
+   select * from lary l1 where exists (select 1 from lary l2 where l1.emp_no=l2.emp_no) limit ....;
+   当limit 1000, 10时, exists 更快; 当limit 1000000, 10时, in更快
+
+4. 事务隔离级别
+   - 不允许脏写: 脏写会导致事务无法recovery
+   - 读未提交: 允许读未提交的数据
+   - 读已提交: 只允许读已提交的数据，但不保证读到的数据不会被其他事务修改
+   - 可重复读: 读到的数据不允许其他事务修改，但允许新增数据
+     实验证明
+5. Two-phase locking protocol 
+   - serialize by lock point
+   - not deadlock free
+   - strict two-phase locking protocol: all exclusive-mode locks be held until commits, so cascadeless
+   - rigorous two-phase locking protocol: 允许从共享锁升级到互斥锁以提高并发
+6. Deadlock
+   - deadlock prevention: when deadlock probility is high
+     + timestamp based
+     + timeout based
+   - deadlock detection and recovery: when deadlock probility is low
+7. Multiple Granularity
+   IS, IX, S, SIX, X
+8. recovery: 不允许读未提交 或者 读了未提交的事务建立依赖链
+9. cascadeless: 不允许读未提交
+
+start transaction
+commit

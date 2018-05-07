@@ -1,0 +1,514 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<title>git</title>
+<!-- 2017-11-23 Thu 12:03 -->
+<meta  http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta  name="generator" content="Org-mode" />
+<meta  name="author" content="root" />
+<style type="text/css">
+ <!--/*--><![CDATA[/*><!--*/
+  .title  { text-align: center; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { color: green; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #ccc;
+    box-shadow: 3px 3px 3px #eee;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: visible;
+    padding-top: 1.2em;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    background-color: white;
+    top: -10px;
+    right: 10px;
+    padding: 3px;
+    border: 1px solid black;
+  }
+  pre.src:hover:before { display: inline;}
+  pre.src-sh:before    { content: 'sh'; }
+  pre.src-bash:before  { content: 'sh'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-R:before     { content: 'R'; }
+  pre.src-perl:before  { content: 'Perl'; }
+  pre.src-java:before  { content: 'Java'; }
+  pre.src-sql:before   { content: 'SQL'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.right  { text-align: center;  }
+  th.left   { text-align: center;   }
+  th.center { text-align: center; }
+  td.right  { text-align: right;  }
+  td.left   { text-align: left;   }
+  td.center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara:nth-child(2) { display: inline; }
+  .footpara { display: block; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  /*]]>*/-->
+</style>
+<script type="text/javascript">
+/*
+@licstart  The following is the entire license notice for the
+JavaScript code in this tag.
+
+Copyright (C) 2012-2013 Free Software Foundation, Inc.
+
+The JavaScript code in this tag is free software: you can
+redistribute it and/or modify it under the terms of the GNU
+General Public License (GNU GPL) as published by the Free Software
+Foundation, either version 3 of the License, or (at your option)
+any later version.  The code is distributed WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS
+FOR A PARTICULAR PURPOSE.  See the GNU GPL for more details.
+
+As additional permission under GNU GPL version 3 section 7, you
+may distribute non-source (e.g., minimized or compacted) forms of
+that code without the copy of the GNU GPL normally required by
+section 4, provided you include this license notice and a URL
+through which recipients can access the Corresponding Source.
+
+
+@licend  The above is the entire license notice
+for the JavaScript code in this tag.
+*/
+<!--/*--><![CDATA[/*><!--*/
+ function CodeHighlightOn(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(null != target) {
+     elem.cacheClassElem = elem.className;
+     elem.cacheClassTarget = target.className;
+     target.className = "code-highlighted";
+     elem.className   = "code-highlighted";
+   }
+ }
+ function CodeHighlightOff(elem, id)
+ {
+   var target = document.getElementById(id);
+   if(elem.cacheClassElem)
+     elem.className = elem.cacheClassElem;
+   if(elem.cacheClassTarget)
+     target.className = elem.cacheClassTarget;
+ }
+/*]]>*///-->
+</script>
+</head>
+<body>
+<div id="content">
+<h1 class="title">git</h1>
+<div id="table-of-contents">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents">
+<ul>
+<li><a href="#sec-1">1. 版本管理工具常用功能</a></li>
+<li><a href="#sec-2">2. Git 实现</a>
+<ul>
+<li><a href="#sec-2-1">2.1. 建立版本(提交)库</a></li>
+<li><a href="#sec-2-2">2.2. 和版本库交互</a>
+<ul>
+<li><a href="#sec-2-2-1">2.2.1. 提交</a></li>
+<li><a href="#sec-2-2-2">2.2.2. 检出</a></li>
+<li><a href="#sec-2-2-3">2.2.3. 暂存区</a></li>
+</ul>
+</li>
+<li><a href="#sec-2-3">2.3. 查看历史记录</a></li>
+<li><a href="#sec-2-4">2.4. 分支</a>
+<ul>
+<li><a href="#sec-2-4-1">2.4.1. 分支概述</a></li>
+<li><a href="#sec-2-4-2">2.4.2. Git工作流程</a></li>
+<li><a href="#sec-2-4-3">2.4.3. 分支常用命令</a></li>
+<li><a href="#sec-2-4-4">2.4.4. 游离态</a></li>
+</ul>
+</li>
+<li><a href="#sec-2-5">2.5. 和其他用户共享彼此修改的内容</a>
+<ul>
+<li><a href="#sec-2-5-1">2.5.1. 添加远程仓库</a></li>
+<li><a href="#sec-2-5-2">2.5.2. 拉取远程仓库的内容</a></li>
+<li><a href="#sec-2-5-3">2.5.3. 检出远程分支</a></li>
+<li><a href="#sec-2-5-4">2.5.4. 将自己的修改分享到远程仓库</a></li>
+<li><a href="#sec-2-5-5">2.5.5. 分支track</a></li>
+<li><a href="#sec-2-5-6">2.5.6. git pull</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+<div id="outline-container-sec-1" class="outline-2">
+<h2 id="sec-1"><span class="section-number-2">1</span> 版本管理工具常用功能</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+版本管理工具最常用的功能包括几个方面:
+</p>
+<ol class="org-ol">
+<li>建立版本库
+<ul class="org-ul">
+<li>以便将项目的每个版本都保存下来
+</li>
+</ul>
+</li>
+<li>和版本库交互
+<ul class="org-ul">
+<li>向版本库中添加新版本(提交)
+</li>
+<li>从版本库中取出某个历史版本(检出)
+</li>
+</ul>
+</li>
+<li>查看历史记录
+<ul class="org-ul">
+<li>比如通过历史查找某个文件都被谁修改过
+</li>
+</ul>
+</li>
+<li>和其他用户共享彼此修改的内容
+</li>
+</ol>
+
+<p>
+注意上面说的版本不是指软件发布版本,而是指任一一次被记入历史的改动。
+下文中的提交和版本都是指 “一次被记入历史的改动”。
+</p>
+</div>
+</div>
+
+<div id="outline-container-sec-2" class="outline-2">
+<h2 id="sec-2"><span class="section-number-2">2</span> Git 实现</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+这里说明Git是如何提供上述功能的。
+</p>
+</div>
+
+<div id="outline-container-sec-2-1" class="outline-3">
+<h3 id="sec-2-1"><span class="section-number-3">2.1</span> 建立版本(提交)库</h3>
+<div class="outline-text-3" id="text-2-1">
+<p>
+执行git init或 git clone进行初始化时, Git会在项目根目录创建版本(
+提交)数据库: 项目根目录下的.git/objects。 
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-2" class="outline-3">
+<h3 id="sec-2-2"><span class="section-number-3">2.2</span> 和版本库交互</h3>
+<div class="outline-text-3" id="text-2-2">
+
+<div class="figure">
+<p><img src="./git_01.jpg" alt="git_01.jpg" />
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-2-1" class="outline-4">
+<h4 id="sec-2-2-1"><span class="section-number-4">2.2.1</span> 提交</h4>
+<div class="outline-text-4" id="text-2-2-1">
+<p>
+git commit 会创建一个包含修改文件/修改人/修改时间等内
+容的新提交。新提交的名字是一串hash码,保存在版本库(.git/objects)
+中。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-2-2" class="outline-4">
+<h4 id="sec-2-2-2"><span class="section-number-4">2.2.2</span> 检出</h4>
+<div class="outline-text-4" id="text-2-2-2">
+<p>
+git checkout 会将指定的某次历史提交的内容从版本库中移出到工作区。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-2-3" class="outline-4">
+<h4 id="sec-2-2-3"><span class="section-number-4">2.2.3</span> 暂存区</h4>
+<div class="outline-text-4" id="text-2-2-3">
+<p>
+暂存区只是一个简单的标记区, 对应.git/index。 git add 会将指定的文件
+放入暂存区并随下一次提交保存到版本库中,而未标记的文件会继续留在工作
+区。暂存区的意义是让用户可以只提交部分改动。
+</p>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-3" class="outline-3">
+<h3 id="sec-2-3"><span class="section-number-3">2.3</span> 查看历史记录</h3>
+<div class="outline-text-3" id="text-2-3">
+<p>
+新提交会把上一次提交作为父提交,所以从当前提交就可以追溯到所有的提
+交历史。 git log命令会展示从指定提交开始的历史记录。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-4" class="outline-3">
+<h3 id="sec-2-4"><span class="section-number-3">2.4</span> 分支</h3>
+<div class="outline-text-3" id="text-2-4">
+</div><div id="outline-container-sec-2-4-1" class="outline-4">
+<h4 id="sec-2-4-1"><span class="section-number-4">2.4.1</span> 分支概述</h4>
+<div class="outline-text-4" id="text-2-4-1">
+<p>
+我们已经知道git用提交来表示用户的一次修改,包括修改文件/修改时间/
+修改人等;同时提交之间的父子关系构成了版本历史。
+但提交是一串hash码,如e4fd230d7144a8d6fd46536b7fb615bb3b2726da,不
+方便记忆和使用, 为此git引入了由用户自己命名的分支。 分支就是指向提交
+的指针,这样通过分支的名字就可以引用提交了。 如.git/refs/heads/master
+中存储的ecf1baff68bc35a49c4906a127f580f40d936e93 就是一次提交的名字。
+</p>
+
+<p>
+如果我们粗略的把提交之间的父子关系看做单链表,分支的另一个作用就是作
+为单链表的头保存我们的提交。 当我们执行commit时,git会自动把新创建的
+提交保存到当前所在分支中，如.git/refs/heads/master。如
+果.git/refs/heads/master损坏了,我们就会丢失提交(单链表的头丢失了,我
+们就没办法引用单链表了)。如下图:
+</p>
+
+
+<div class="figure">
+<p><img src="./git_02.jpg" alt="git_02.jpg" />
+</p>
+</div>
+
+<p>
+master分支和testing分支分别指向不同的commit,他们相互独立。图中的
+HEAD对应.git/HEAD文件,用于保存工作区所在的提交。图中HEAD指向
+master说明我们当前所在的分支是master,也就是我们的工作区对应的
+是master分支指向的提交。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-4-2" class="outline-4">
+<h4 id="sec-2-4-2"><span class="section-number-4">2.4.2</span> Git工作流程</h4>
+<div class="outline-text-4" id="text-2-4-2">
+<p>
+由于分支作为单链表头可以互不影响的保存我们的提交, 所以我们可以在不
+同的分支上进行不同的工作。注意下图中我们的修改C4被保存在了hotfix分
+支，如果此时我们删除hotfix分支，我们就会丢失C4中的修改。
+</p>
+
+
+<div class="figure">
+<p><img src="./git_03.jpg" alt="git_03.jpg" />
+</p>
+</div>
+
+<p>
+我们分别在hotfix和issue53上做不同的工作，最后再将他们分别合并到
+master上。合并hotfix如下图:
+</p>
+
+
+<div class="figure">
+<p><img src="./git_04.jpg" alt="git_04.jpg" />
+</p>
+</div>
+
+<p>
+合并issue53 如下图:
+</p>
+
+
+<div class="figure">
+<p><img src="./git_05.jpg" alt="git_05.jpg" />
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-4-3" class="outline-4">
+<h4 id="sec-2-4-3"><span class="section-number-4">2.4.3</span> 分支常用命令</h4>
+<div class="outline-text-4" id="text-2-4-3">
+</div><ol class="org-ol"><li><a id="sec-2-4-3-1" name="sec-2-4-3-1"></a>分支创建<br  /><div class="outline-text-5" id="text-2-4-3-1">
+<div class="org-src-container">
+
+<pre class="src src-shell">git branch hotfix release_1.0
+git checkout -b hotfix release_1.0
+</pre>
+</div>
+
+<p>
+分支做为"链表头"也用于建立独立的空间, 比如上述命令以 <code>release_1.0</code> 为基
+准建立了一个新的hotfix分支。
+</p>
+</div>
+</li>
+<li><a id="sec-2-4-3-2" name="sec-2-4-3-2"></a>分支切换<br  /><div class="outline-text-5" id="text-2-4-3-2">
+<div class="org-src-container">
+
+<pre class="src src-shell">git checkout testing
+</pre>
+</div>
+
+<p>
+git会把testing分支指向的版本对应的内容覆盖到工作区中, 并将
+HEAD(.git/HEAD) 指向testing。 由于涉及到内容覆盖, 如果覆盖会导致用户
+工作区中的修改丢失, 出于保护git会拒绝切换。
+</p>
+</div>
+</li>
+<li><a id="sec-2-4-3-3" name="sec-2-4-3-3"></a>分支合并<br  /><div class="outline-text-5" id="text-2-4-3-3">
+<div class="org-src-container">
+
+<pre class="src src-shell">git merge hotfix
+</pre>
+</div>
+
+<p>
+上面的命令将hotfix中的内容合并到当前分支。
+</p>
+</div>
+</li></ol>
+</div>
+<div id="outline-container-sec-2-4-4" class="outline-4">
+<h4 id="sec-2-4-4"><span class="section-number-4">2.4.4</span> 游离态</h4>
+<div class="outline-text-4" id="text-2-4-4">
+<p>
+当执行git checkout + 某次提交的hash码时, 就会进入游离态。
+当执行commit时, 我们必须在某个分支上, 因为需要分支帮我们保存
+"单链表"的头。 游离态的含义就是不在任何一个分支上, 所以也就不能执行提交。
+如果执行git checkout + 某次提交的hash码时, git自动创建一个分支, 那
+就没有必要引入游离态了。 但是这样每次checkout都会创建一个不必要的新
+分支。 所以游离态就是git一个合理的默认值而已(默认不自动创建分支)。
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-5" class="outline-3">
+<h3 id="sec-2-5"><span class="section-number-3">2.5</span> 和其他用户共享彼此修改的内容</h3>
+<div class="outline-text-3" id="text-2-5">
+<p>
+上面的内容都是在操作用户本地的版本库,和其他用户协作时,就需要和远
+程仓库交互。也就是说大家通过一个公共的远程仓库来交换彼此的数据。
+</p>
+</div>
+<div id="outline-container-sec-2-5-1" class="outline-4">
+<h4 id="sec-2-5-1"><span class="section-number-4">2.5.1</span> 添加远程仓库</h4>
+<div class="outline-text-4" id="text-2-5-1">
+<div class="org-src-container">
+
+<pre class="src src-shell">git remote add origin git@host/xx.git
+</pre>
+</div>
+</div>
+</div>
+
+<div id="outline-container-sec-2-5-2" class="outline-4">
+<h4 id="sec-2-5-2"><span class="section-number-4">2.5.2</span> 拉取远程仓库的内容</h4>
+<div class="outline-text-4" id="text-2-5-2">
+<div class="org-src-container">
+
+<pre class="src src-shell">git fetch origin
+</pre>
+</div>
+
+<p>
+这个命令会修改版本库(.git/object/)但不会修改工作区。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-5-3" class="outline-4">
+<h4 id="sec-2-5-3"><span class="section-number-4">2.5.3</span> 检出远程分支</h4>
+<div class="outline-text-4" id="text-2-5-3">
+<div class="org-src-container">
+
+<pre class="src src-shell">git checkout -b dev origin/dev
+</pre>
+</div>
+<p>
+git fetch 将远程仓库的修改内容放到.git/object中，git checkout负责
+将.git/object中的内容放入工作区，这样我们就可以看到别人的修改了。
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-5-4" class="outline-4">
+<h4 id="sec-2-5-4"><span class="section-number-4">2.5.4</span> 将自己的修改分享到远程仓库</h4>
+<div class="outline-text-4" id="text-2-5-4">
+<div class="org-src-container">
+
+<pre class="src src-shell">git push
+</pre>
+</div>
+</div>
+</div>
+<div id="outline-container-sec-2-5-5" class="outline-4">
+<h4 id="sec-2-5-5"><span class="section-number-4">2.5.5</span> 分支track</h4>
+<div class="outline-text-4" id="text-2-5-5">
+<div class="org-src-container">
+
+<pre class="src src-shell">git branch --set-upstream-to origin/dev
+</pre>
+</div>
+
+<p>
+通过&#x2013;set-upstream-to 选项可以建立本地分支和远程分支的对应关系
+git checkout -b issue31 origin/issue31 
+从远程分支检出本地分支时, git会自动建立track关系
+</p>
+</div>
+</div>
+<div id="outline-container-sec-2-5-6" class="outline-4">
+<h4 id="sec-2-5-6"><span class="section-number-4">2.5.6</span> git pull</h4>
+<div class="outline-text-4" id="text-2-5-6">
+<p>
+git pull命令会拉取远程仓库的内容,并将当前分支track的远程分支merge到
+当前分支。也就是
+</p>
+<div class="org-src-container">
+
+<pre class="src src-shell">git fetch origin 
+git merge origin/&lt;current branch&gt;
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: root</p>
+<p class="date">Created: 2017-11-23 Thu 12:03</p>
+<p class="creator"><a href="http://www.gnu.org/software/emacs/">Emacs</a> 24.5.1 (<a href="http://orgmode.org">Org</a> mode 8.2.10)</p>
+<p class="validation"><a href="http://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

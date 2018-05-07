@@ -1,0 +1,69 @@
+* Understanding the Spring Framework transaction abstraction
+** PlatformTransactionManager
+
+   #+BEGIN_SRC java
+
+   public interface PlatformTransactionManager {
+
+           TransactionStatus getTransaction(TransactionDefinition definition) throws TransactionException;
+
+           void commit(TransactionStatus status) throws TransactionException;
+
+           void rollback(TransactionStatus status) throws TransactionException;
+   }
+      
+   #+END_SRC
+
+** TransactionDefinition
+
+   #+BEGIN_SRC java
+
+   public interface TransactionDefinition {
+
+       int getPropagationBehavior();
+
+       int getIsolationLevel();
+
+       int getTimeout();
+
+       boolean isReadOnly();
+
+       String getName();
+
+   }
+      
+   #+END_SRC
+
+** TransactionStatus
+
+   #+BEGIN_SRC java
+
+   public interface TransactionStatus extends SavepointManager {
+
+       boolean isNewTransaction();
+
+       boolean hasSavepoint();
+
+       void setRollbackOnly();
+
+       boolean isRollbackOnly();
+
+       void flush();
+
+       boolean isCompleted();
+   }
+      
+   #+END_SRC
+
+* 注意点
+
+1. @EnableTransactionManagement and <tx:annotation-driven/> only looks for
+   @Transactional on beans in the same application context they are defined in. This
+   means that, if you put annotation driven configuration in a WebApplicationContext for a
+   DispatcherServlet, it only checks for @Transactional beans in your controllers, and not
+   your services. See Section 21.2, “The DispatcherServlet” for more information.
+
+* 问题
+1. Transaction suspend ?? 释放连接是否影响事务? 如何影响?
+2. cglib和jdk dynamic proxy区别如何？ cglib能否支持非public方法？
+3. 事务传播机制？

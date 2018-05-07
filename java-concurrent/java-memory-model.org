@@ -1,0 +1,53 @@
+* Intra-thread Semantics
+  the semantics for single-threaded programs, and allow the complete prediction of the behavior of a thread based on the values seen by read actions within the thread.
+* Inter-thead Actions:
+   + Read (normal, or non-volatile). Reading a variable.
+   + Write (normal, or non-volatile). Writing a variable.
+   + Synchronization actions, which are:
+       – Volatile read. A volatile read of a variable.
+       – Volatile write. A volatile write of a variable.
+       – Lock. Locking a monitor
+       – Unlock. Unlocking a monitor.
+       – The (synthetic) first and last action of a thread.
+       – Actions that start a thread or detect that a thread has terminated (§17.4.4).
+   + External Actions. An external action is an action that may be observable outside of an execution, and has a result based on an environment external to the execution.
+   + Thread divergence actions (§17.4.9). A thread divergence action is only performed by a thread that is in an infinite loop in which no memory, synchronization, or external actions are performed. 
+     If a thread performs a thread divergence action, it will be followed by an infinite number of thread divergence actions.
+* Execution Order
+   1. Program Order :: Sequential consistency
+      1. Among all the inter-thread actions performed by each thread t, the program order of t is a total order that reflects the order in which these actions would be performed according to the intra-thread semantics of t.
+      2. each individual action is atomic and is immediately visible to every thread.
+      3. Sequential consistency and/or freedom from data races still allows errors arising from groups of operations that need to be perceived atomically and are not.
+   2. Synchronization Order ::
+      1. For each thread t, the synchronization order of the synchronization actions in t is consistent with the program order of t.
+      2. The source of a synchronizes-with edge is called a release, and the destination is called an acquire.
+      3. synchronizes-with
+         + An unlock action on monitor m synchronizes-with all subsequent lock actions on m 
+         + A write to a volatile variable v (§8.3.1.4) synchronizes-with all subsequent reads of v by any thread 
+         + An action that starts a thread synchronizes-with the first action in the thread it starts.
+         + The write of the default value (zero, false , or null ) to each variable synchronizes-with the first action in every thread.
+           Although it may seem a little strange to write a default value to a variable before the
+           object containing the variable is allocated, conceptually every object is created at the
+           start of the program with its default initialized values.
+         + The final action in a thread T1 synchronizes-with any action in another thread T2 that detects that T1 has terminated.
+           T2 may accomplish this by calling T1.isAlive() or T1.join() .
+         + If thread T1 interrupts thread T2 , the interrupt by T1 synchronizes-with any point where any other thread (including T2 ) determines that T2 has been interrupted (by
+           having an InterruptedException thrown or by invoking Thread.interrupted or Thread.isInterrupted ).
+   3. Happens-before Order
+      1. Two actions can be ordered by a happens-before relationship. If one action
+         happens-before another, then the first is visible to and ordered before the second.
+      2. If we have two actions x and y, we write hb(x, y) to indicate that x happens-before y.
+         + If x and y are actions of the same thread and x comes before y in program order, then hb(x, y).
+         + There is a happens-before edge from the end of a constructor of an object to the start of a finalizer (§12.6) for that object.
+         + If an action x synchronizes-with a following action y, then we also have hb(x, y).
+         + If hb(x, y) and hb(y, z), then hb(x, z).
+
+* Java Concurrency In Practice
+** Initialization Safety
+   An object reference becomes visible to another thread does not necessarily mean that the state of that object is visible to the consuming thread.
+
+** Immutable Object
+   Immutable objects, on the other hand, can be safely accessed even when synchronization is not used to publish the object reference. 
+   For this guarantee of initialization safety to hold, all of the requirements for immutability must be met: unmodifiable state, all fields are final, and proper construction.
+
+** 

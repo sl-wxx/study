@@ -1,0 +1,112 @@
+* AMQP Client
+
+** 核心接口
+
+   1. Channel
+
+      用于实现AMQP协议规定的动作
+
+      #+BEGIN_SRC java
+                  
+      void basicPublish(String exchange, String routingKey, BasicProperties props, byte[] body) throws IOException;
+
+      void basicAck(long deliveryTag, boolean multiple) throws IOException;
+
+      #+END_SRC
+
+   2. Connection
+
+      #+BEGIN_SRC java
+
+      Channel createChannel() throws IOException;
+            
+      #+END_SRC
+
+   3. ConnectionFactory
+
+      #+BEGIN_SRC java
+
+      public Connection newConnection(ExecutorService executor, Address[] addrs);
+            
+      #+END_SRC
+
+   4. Consumer
+
+      #+BEGIN_SRC java
+
+      void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body) throws IOException;
+            
+      #+END_SRC
+
+** 核心流程
+
+   #+begin_example
+
+   1. ConnectionFactory.newConnection().start();
+
+       建立会话，并新建线程启动MainLoop
+
+   2. MainLoop.run()
+
+       不停的从连接读数据，并将读到的数据封装到frame中，由ChannelManager.getChannel(frame.channel).handleFrame(frame)处理
+
+   3. ChannelN.processAsyn() 
+
+       channel根据数据内容中的consumerTag找到对应的Consumer，然后把Consumer和消息一起传给ConsumerDispatcher
+
+   4. ConsumerDispatcher.handleDelivery(handleDelivery(final Consumer delegate,
+                               final String consumerTag,
+                               final Envelope envelope,
+                               final AMQP.BasicProperties properties,
+                               final byte[] body) throws IOException);
+
+       ConsumerDispatcher将调用Consumer.onMessage()的代码封装成一个task，添加到待处理任务队列中。即: ConsumerDispatcher.workService.addWork(delegate.handleDelivery());
+
+   #+end_example
+
+** 并发相关
+
+   1. 取消息的逻辑在MainLoop中，是单线程操作。
+   2. 实际消费消息在ConsumerDispatcher中，会使用线程池。
+   3. 如果ConnectionFactory设置了sharedExecutor，则由该ConnectionFactory创建的所有连接共用sharedExecutor
+   4. 如果没有设置，则每个Connection会创建一个自己的FixedThreadPool 线程数为核心数*2
+
+* Spring rabbit
+  spring-rabbit是spring对amqp-client的封装，主要是通过SimpleMessageListenerContainer
+
+** 核心流程
+*** SimpleMessageListenerContainer
+
+  1. 提供用户配置的接口，用户可以配置ConnectionFactory, concurrentConsumers, messageListener, taskExecutor等
+  2. 在doStart()方法中, 初始化AsyncMessageProcessingConsumer,并由taskExecutor执行其run方法
+
+*** AsyncMessageProcessingConsumer
+    该类是一个任务封装类，实现了Runnable接口
+  1. 在run方法中先调用BlockingQueueConsumer的start()方法完成连接创建和Consumer注册
+  2. 再循环调用doReceiveAndExecute方法
+  3. recieve是通过BlockingQueueConsumer获取消息
+  4. execute是回调MessageListener的onMessage方法
+
+*** BlockingQueueConsumer
+  1. 在start()方法中先创建MQ连接，并调用AMQConnection的start方法启动MainLoop
+  2. 再调用Channel.basicConsume()注册Consumer 即InternalConsumer
+  3. InternalConsumer的handleDelivery方法将收到的消息放入BlockingQueueConsumer的队列中，供AsyncMessageProcessingConsumer使用
+
+** 并发相关
+  1. spring-rabbit底层是amqp-client，所以ConsumerDispatcher使用的线程池不变。
+  2. spring-rabbit提供了一个额外的属性concurrencyConsumers，可以设置每个队列的Consumer的数量
+
+     ** Lord of the Rings
+        My favorite scenes are (in this order)
+        1. The attack of the Rohirrim
+        2. Eowyn's fight with the witch king
+           + this was already my favorite scene in the book
+           + I really like Miranda Otto.
+        3. Peter Jackson being shot by Legolas
+           - on DVD only
+           He makes a really funny face when it happens.
+        But in the end, no individual scenes matter but the film as a whole.
+        Important actors in this film are:
+        - Elijah Wood :: He plays Frodo
+        - Sean Astin :: He plays Sam, Frodo's friend.  I still remember
+          him very well from his role as Mikey Walsh in The Goonies.

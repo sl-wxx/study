@@ -1,0 +1,126 @@
+这里给出一个使用autotools的简单例子。
+
+* 样例代码
+
+#+CAPTION: hello.c
+#+BEGIN_SRC c
+
+#include<stdio.h>
+
+int foo();
+
+int main()
+{
+    return foo();
+}
+
+#+END_SRC
+
+
+#+CAPTION: foo.c
+#+BEGIN_SRC c
+
+#include<stdio.h>
+
+int foo()
+{
+    printf("foo");
+    return 0;
+}
+
+#+END_SRC
+
+* 加入autotools
+
+** 建立configure.ac
+1. 生成configure.ac, 执行如下两条命令
+
+   #+BEGIN_SRC shell
+   autoscan
+   mv configure.scan configure.ac
+   #+END_SRC
+
+2. 修改configure.ac
+   =AC_INIT= 后面新增3行:
+
+   + =AM_INIT_AUTOMAKE([-Wall])=
+   + =LT_INIT=
+   + =AC_CONFIG_MACRO_DIRS([m4])=
+
+   =AC_OUTPUT= 前面新增1行:
+   + =AC_CONFIG_FILES([Makefile])=
+
+   最终结果如下:
+
+   #+BEGIN_SRC shell
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
+AC_PREREQ([2.69])
+AC_INIT([FULL-PACKAGE-NAME], [VERSION], [BUG-REPORT-ADDRESS])
+
+# init Automake 
+AM_INIT_AUTOMAKE([-Wall]) 
+# init Libtool
+LT_INIT
+
+AC_CONFIG_MACRO_DIRS([m4])
+
+AC_CONFIG_SRCDIR([hello.c])
+AC_CONFIG_HEADERS([config.h])
+
+# Checks for programs.
+AC_PROG_CC
+
+# Checks for libraries.
+
+# Checks for header files.
+
+# Checks for typedefs, structures, and compiler characteristics.
+
+# Checks for library functions.
+
+AC_CONFIG_FILES([Makefile])
+
+AC_OUTPUT   
+   #+END_SRC
+   
+** 手写Makefile.am
+
+   #+BEGIN_SRC shell
+ACLOCAL_AMFLAGS = -I m4
+
+# _LTLIBRARIES 是 Automake 支持 Libtool 的原语
+lib_LTLIBRARIES = libfoo.la 
+libfoo_la_SOURCES = foo.c 
+# 可以通过 _LDFLAGS 传递选项给 Libtool 
+libfoo_la_LDFLAGS = 
+# 通过 _LIBADD 可以指定库依赖关系
+libfoo_la_LIBADD  =
+
+   #+END_SRC
+
+** 建立必须的文件
+   #+BEGIN_SRC shell
+   touch NEWS README AUTHORS ChangeLog
+   #+END_SRC
+
+** 执行libtoolize
+   #+BEGIN_SRC shell
+   liboolize
+   #+END_SRC
+
+** 执行autoreconf
+   #+BEGIN_SRC shell
+   autoreconf -s -i
+   #+END_SRC
+
+** 至此autotools已经引入完毕
+   #+BEGIN_SRC shell
+   ./configure
+   make          # 这一步已经生成了libfoo.la和.libs/libfoo.so
+   
+   libtool --mode=compile gcc -g -O -c hello.c
+   libtool --mode=link gcc -g -O -o hello hello.lo libfoo.la
+   ./hello      # 打印出foo
+   #+END_SRC
