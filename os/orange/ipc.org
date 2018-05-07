@@ -1,0 +1,355 @@
+#+OPTIONS: ^:nil
+* 概述
+** 发送消息
+1. 发送进程先准备一个消息体(注意不是PCB中的p_msg)
+2. 通过系统调用走到msg_send方法
+3. 如果有其他进程在等待这个消息
+   1. 复制消息体到等待进程PCB的p_msg指针指向的位置
+   2. 将等待进程p_msg指针置空(注意这里只是将指针置空,实际的消息体仍然可以由其他指针引用)
+   3. 将等待进程的状态由RECEIVING改为RUNNING
+   4. 修改等待进程PCB的p_recvfrom为NO_TASK
+4. 如果没有其他进程在等待
+   1. 将发送进程的状态修改为SENDING
+   2. 将发送进程的PCB的p_sendto修改为目标进程PID
+   3. 将发送进程PCB的p_msg指针指向最初准备的消息体
+   4. 将当前进程加入目标进程的发送等待队列
+   5. 阻塞当前进程(设置当前进程状态为SENDING,并调用schedule方法切换进程)
+5. 这里要注意PCB中的p_msg只是一个指针,真正的消息体所在的位置一直没有变化
+
+** 接收消息
+1. 首先准备一个消息体(不是PCB的p_msg)
+2. 如果想要接收中断消息且中断通知(has_int_msg)为1,则临时创建一个消息体返回给当前进程
+3. 如果想要接收的消息已经发出,且发送进程处于阻塞装备
+   1. 从发送进程等待队列中找出当前进程想要接收的进程
+   2. 从找到的发送进程的p_msg指向的位置复制消息体
+   3. 将该发送进程的状态改为RUNNING
+4. 如果不存在合适的发送进程
+   1. 将当前进程状态改为RECEIVING
+   2. 将当前进程的p_msg指向最初准备的消息体
+   3. 将当前进程的p_recvfrom指向目标进程的PID
+   4. 阻塞当前进程(设置当前进程状态为RECEIVING,并调用schedule方法切换进程)
+
+** 注意
+1. 在发送过程中, 只有进程处于SENDING状态p_msg指针才有意义.
+2. 相应的,在接收过程中只有进程处于RECEIVING状态p_msg指针才有意义.
+3. 在发送和接收的整个过程中,消息体的实际位置都没有变化.
+* 源码
+** 用户接口
+#+BEGIN_SRC c
+PUBLIC int send_recv(int function, int src_dest, MESSAGE* msg)
+{
+	int ret = 0;
+
+	if (function == RECEIVE)
+		memset(msg, 0, sizeof(MESSAGE));
+
+	switch (function) {
+	case BOTH:
+		ret = sendrec(SEND, src_dest, msg);
+		if (ret == 0)
+			ret = sendrec(RECEIVE, src_dest, msg);
+		break;
+	case SEND:
+	case RECEIVE:
+		ret = sendrec(function, src_dest, msg);
+		break;
+	default:
+		assert((function == BOTH) ||
+		       (function == SEND) || (function == RECEIVE));
+		break;
+	}
+
+	return ret;
+}
+#+END_SRC
+** 系统调用接口
+#+BEGIN_SRC asm
+sendrec:
+	mov	eax, _NR_sendrec
+	mov	ebx, [esp + 4]	; function
+	mov	ecx, [esp + 8]	; src_dest
+	mov	edx, [esp + 12]	; p_msg
+	int	INT_VECTOR_SYS_CALL
+	ret
+
+sys_call:
+    call    save
+
+    sti
+	push	esi
+
+	push	dword [p_proc_ready]
+	push	edx
+	push	ecx
+	push	ebx
+    call    [sys_call_table + eax * 4]
+	add	esp, 4 * 4
+
+	pop	esi
+    mov     [esi + EAXREG - P_STACKBASE], eax
+    cli
+    ret
+#+END_SRC
+** 实际的系统调用函数
+#+BEGIN_SRC c
+PUBLIC int sys_sendrec(int function, int src_dest, MESSAGE* m, struct proc* p)
+{
+	assert(k_reenter == 0);	/* make sure we are not in ring0 */
+	assert((src_dest >= 0 && src_dest < NR_TASKS + NR_PROCS) ||
+	       src_dest == ANY ||
+	       src_dest == INTERRUPT);
+
+	int ret = 0;
+	int caller = proc2pid(p);
+	MESSAGE* mla = (MESSAGE*)va2la(caller, m);
+	mla->source = caller;
+
+	assert(mla->source != src_dest);
+
+	/**
+	 * Actually we have the third message type: BOTH. However, it is not
+	 * allowed to be passed to the kernel directly. Kernel doesn't know
+	 * it at all. It is transformed into a SEND followed by a RECEIVE
+	 * by `send_recv()'.
+	 */
+	if (function == SEND) {
+		ret = msg_send(p, src_dest, m);
+		if (ret != 0)
+			return ret;
+	}
+	else if (function == RECEIVE) {
+		ret = msg_receive(p, src_dest, m);
+		if (ret != 0)
+			return ret;
+	}
+	else {
+		panic("{sys_sendrec} invalid function: "
+		      "%d (SEND:%d, RECEIVE:%d).", function, SEND, RECEIVE);
+	}
+
+	return 0;
+}
+#+END_SRC
+*** 发送
+#+BEGIN_SRC c
+PRIVATE int msg_send(struct proc* current, int dest, MESSAGE* m)
+{
+	struct proc* sender = current;
+	struct proc* p_dest = proc_table + dest; /* proc dest */
+
+	assert(proc2pid(sender) != dest);
+
+	/* check for deadlock here */
+	if (deadlock(proc2pid(sender), dest)) {
+		panic(">>DEADLOCK<< %s->%s", sender->name, p_dest->name);
+	}
+
+	if ((p_dest->p_flags & RECEIVING) && /* dest is waiting for the msg */
+	    (p_dest->p_recvfrom == proc2pid(sender) ||
+	     p_dest->p_recvfrom == ANY)) {
+		assert(p_dest->p_msg);
+		assert(m);
+
+		phys_copy(va2la(dest, p_dest->p_msg),
+			  va2la(proc2pid(sender), m),
+			  sizeof(MESSAGE));
+		p_dest->p_msg = 0;
+		p_dest->p_flags &= ~RECEIVING; /* dest has received the msg */
+		p_dest->p_recvfrom = NO_TASK;
+		unblock(p_dest);
+
+		assert(p_dest->p_flags == 0);
+		assert(p_dest->p_msg == 0);
+		assert(p_dest->p_recvfrom == NO_TASK);
+		assert(p_dest->p_sendto == NO_TASK);
+		assert(sender->p_flags == 0);
+		assert(sender->p_msg == 0);
+		assert(sender->p_recvfrom == NO_TASK);
+		assert(sender->p_sendto == NO_TASK);
+	}
+	else { /* dest is not waiting for the msg */
+		sender->p_flags |= SENDING;
+		assert(sender->p_flags == SENDING);
+		sender->p_sendto = dest;
+		sender->p_msg = m;
+
+		/* append to the sending queue */
+		struct proc * p;
+		if (p_dest->q_sending) {
+			p = p_dest->q_sending;
+			while (p->next_sending)
+				p = p->next_sending;
+			p->next_sending = sender;
+		}
+		else {
+			p_dest->q_sending = sender;
+		}
+		sender->next_sending = 0;
+
+		block(sender);
+
+		assert(sender->p_flags == SENDING);
+		assert(sender->p_msg != 0);
+		assert(sender->p_recvfrom == NO_TASK);
+		assert(sender->p_sendto == dest);
+	}
+
+	return 0;
+}
+#+END_SRC 
+
+*** 接收
+#+BEGIN_SRC c
+PRIVATE int msg_receive(struct proc* current, int src, MESSAGE* m)
+{
+	struct proc* p_who_wanna_recv = current; /**
+						  * This name is a little bit
+						  * wierd, but it makes me
+						  * think clearly, so I keep
+						  * it.
+						  */
+	struct proc* p_from = 0; /* from which the message will be fetched */
+	struct proc* prev = 0;
+	int copyok = 0;
+
+	assert(proc2pid(p_who_wanna_recv) != src);
+
+	if ((p_who_wanna_recv->has_int_msg) &&
+	    ((src == ANY) || (src == INTERRUPT))) {
+		/* There is an interrupt needs p_who_wanna_recv's handling and
+		 * p_who_wanna_recv is ready to handle it.
+		 */
+
+		MESSAGE msg;
+		reset_msg(&msg);
+		msg.source = INTERRUPT;
+		msg.type = HARD_INT;
+		assert(m);
+		phys_copy(va2la(proc2pid(p_who_wanna_recv), m), &msg,
+			  sizeof(MESSAGE));
+
+		p_who_wanna_recv->has_int_msg = 0;
+
+		assert(p_who_wanna_recv->p_flags == 0);
+		assert(p_who_wanna_recv->p_msg == 0);
+		assert(p_who_wanna_recv->p_sendto == NO_TASK);
+		assert(p_who_wanna_recv->has_int_msg == 0);
+
+		return 0;
+	}
+
+
+	/* Arrives here if no interrupt for p_who_wanna_recv. */
+	if (src == ANY) {
+		/* p_who_wanna_recv is ready to receive messages from
+		 * ANY proc, we'll check the sending queue and pick the
+		 * first proc in it.
+		 */
+		if (p_who_wanna_recv->q_sending) {
+			p_from = p_who_wanna_recv->q_sending;
+			copyok = 1;
+
+			assert(p_who_wanna_recv->p_flags == 0);
+			assert(p_who_wanna_recv->p_msg == 0);
+			assert(p_who_wanna_recv->p_recvfrom == NO_TASK);
+			assert(p_who_wanna_recv->p_sendto == NO_TASK);
+			assert(p_who_wanna_recv->q_sending != 0);
+			assert(p_from->p_flags == SENDING);
+			assert(p_from->p_msg != 0);
+			assert(p_from->p_recvfrom == NO_TASK);
+			assert(p_from->p_sendto == proc2pid(p_who_wanna_recv));
+		}
+	}
+	else {
+		/* p_who_wanna_recv wants to receive a message from
+		 * a certain proc: src.
+		 */
+		p_from = &proc_table[src];
+
+		if ((p_from->p_flags & SENDING) &&
+		    (p_from->p_sendto == proc2pid(p_who_wanna_recv))) {
+			/* Perfect, src is sending a message to
+			 * p_who_wanna_recv.
+			 */
+			copyok = 1;
+
+			struct proc* p = p_who_wanna_recv->q_sending;
+			assert(p); /* p_from must have been appended to the
+				    * queue, so the queue must not be NULL
+				    */
+			while (p) {
+				assert(p_from->p_flags & SENDING);
+				if (proc2pid(p) == src) { /* if p is the one */
+					p_from = p;
+					break;
+				}
+				prev = p;
+				p = p->next_sending;
+			}
+
+			assert(p_who_wanna_recv->p_flags == 0);
+			assert(p_who_wanna_recv->p_msg == 0);
+			assert(p_who_wanna_recv->p_recvfrom == NO_TASK);
+			assert(p_who_wanna_recv->p_sendto == NO_TASK);
+			assert(p_who_wanna_recv->q_sending != 0);
+			assert(p_from->p_flags == SENDING);
+			assert(p_from->p_msg != 0);
+			assert(p_from->p_recvfrom == NO_TASK);
+			assert(p_from->p_sendto == proc2pid(p_who_wanna_recv));
+		}
+	}
+
+	if (copyok) {
+		/* It's determined from which proc the message will
+		 * be copied. Note that this proc must have been
+		 * waiting for this moment in the queue, so we should
+		 * remove it from the queue.
+		 */
+		if (p_from == p_who_wanna_recv->q_sending) { /* the 1st one */
+			assert(prev == 0);
+			p_who_wanna_recv->q_sending = p_from->next_sending;
+			p_from->next_sending = 0;
+		}
+		else {
+			assert(prev);
+			prev->next_sending = p_from->next_sending;
+			p_from->next_sending = 0;
+		}
+
+		assert(m);
+		assert(p_from->p_msg);
+		/* copy the message */
+		phys_copy(va2la(proc2pid(p_who_wanna_recv), m),
+			  va2la(proc2pid(p_from), p_from->p_msg),
+			  sizeof(MESSAGE));
+
+		p_from->p_msg = 0;
+		p_from->p_sendto = NO_TASK;
+		p_from->p_flags &= ~SENDING;
+		unblock(p_from);
+	}
+	else {  /* nobody's sending any msg */
+		/* Set p_flags so that p_who_wanna_recv will not
+		 * be scheduled until it is unblocked.
+		 */
+		p_who_wanna_recv->p_flags |= RECEIVING;
+
+		p_who_wanna_recv->p_msg = m;
+
+		if (src == ANY)
+			p_who_wanna_recv->p_recvfrom = ANY;
+		else
+			p_who_wanna_recv->p_recvfrom = proc2pid(p_from);
+
+		block(p_who_wanna_recv);
+
+		assert(p_who_wanna_recv->p_flags == RECEIVING);
+		assert(p_who_wanna_recv->p_msg != 0);
+		assert(p_who_wanna_recv->p_recvfrom != NO_TASK);
+		assert(p_who_wanna_recv->p_sendto == NO_TASK);
+		assert(p_who_wanna_recv->has_int_msg == 0);
+	}
+
+	return 0;
+}
+#+END_SRC

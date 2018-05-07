@@ -1,0 +1,149 @@
+#+OPTIONS: ^:nil
+* 源码
+** 文件系统主循环
+1. task_fs作为一个任务并不需要先于用户进程启动,因为用户进程发送的消息会保存到task_fs的PCB中
+2. task_fs中的文件可以是磁盘上的文件,也可以是特殊字符设备TTY
+#+BEGIN_SRC c
+PUBLIC void task_fs()
+{
+	init_fs();
+
+	while (1) {
+		send_recv(RECEIVE, ANY, &fs_msg);
+
+		int msgtype = fs_msg.type;
+		int src = fs_msg.source;
+		pcaller = &proc_table[src];
+
+		switch (msgtype) {
+		case OPEN:
+			fs_msg.FD = do_open();
+			break;
+		case CLOSE:
+			fs_msg.RETVAL = do_close();
+			break;
+		case READ:
+		case WRITE:
+			fs_msg.CNT = do_rdwt();
+			break;
+		case UNLINK:
+			fs_msg.RETVAL = do_unlink();
+			break;
+		case RESUME_PROC:
+			src = fs_msg.PROC_NR;
+			break;
+		default:
+			dump_msg("FS::unknown message:", &fs_msg);
+			assert(0);
+			break;
+		}
+		/* reply */
+		if (fs_msg.type != SUSPEND_PROC) {
+			fs_msg.type = SYSCALL_RET;
+			send_recv(SEND, src, &fs_msg);
+		}
+	}
+}
+#+END_SRC
+** 初始化
+#+BEGIN_SRC c
+PRIVATE void init_fs()
+{
+	int i;
+
+	/* f_desc_table[] */
+	for (i = 0; i < NR_FILE_DESC; i++)
+		memset(&f_desc_table[i], 0, sizeof(struct file_desc));
+
+	/* inode_table[] */
+	for (i = 0; i < NR_INODE; i++)
+		memset(&inode_table[i], 0, sizeof(struct inode));
+
+	/* super_block[] */
+	struct super_block * sb = super_block;
+	for (; sb < &super_block[NR_SUPER_BLOCK]; sb++)
+		sb->sb_dev = NO_DEV;
+
+	/* open the device: hard disk */
+	MESSAGE driver_msg;
+	driver_msg.type = DEV_OPEN;
+	driver_msg.DEVICE = MINOR(ROOT_DEV);
+	assert(dd_map[MAJOR(ROOT_DEV)].driver_nr != INVALID_DRIVER);
+	send_recv(BOTH, dd_map[MAJOR(ROOT_DEV)].driver_nr, &driver_msg);
+
+	/* make FS */
+	mkfs();
+
+	/* load super block of ROOT */
+	read_super_block(ROOT_DEV);
+
+	sb = get_super_block(ROOT_DEV);
+	assert(sb->magic == MAGIC_V1);
+
+	root_inode = get_inode(ROOT_DEV, ROOT_INODE);
+}
+#+END_SRC
+1. 先将f_desc_table, inode_table, super_block这三个数组的成员全都初始化为null
+   1. super_block用于缓存文件系统的元数据, 磁盘的每个分区都对应一个super_block. 其结构如下:
+      #+BEGIN_SRC c
+           struct super_block {
+                   u32 magic;        /**< Magic number */
+                   u32 nr_inodes;    /**< How many inodes */
+                   u32 nr_sects;     /**< How many sectors */
+                   u32 nr_imap_sects;    /**< How many inode-map sectors */
+                   u32 nr_smap_sects;    /**< How many sector-map sectors */
+                   u32 n_1st_sect;   /**< Number of the 1st data sector */
+                   u32 nr_inode_sects;   /**< How many inode sectors */
+                   u32 root_inode;       /**< Inode nr of root directory */
+                   u32 inode_size;       /**< INODE_SIZE */
+                   u32 inode_isize_off;  /**< Offset of `struct inode::i_size' */
+                   u32 inode_start_off;  /**< Offset of `struct inode::i_start_sect' */
+                   u32 dir_ent_size;     /**< DIR_ENTRY_SIZE */
+                   u32 dir_ent_inode_off;/**< Offset of `struct dir_entry::inode_nr' */
+                   u32 dir_ent_fname_off;/**< Offset of `struct dir_entry::name' */
+
+      /* the following item(s) are only present in memory */
+                   int sb_dev;     /**< the super block's home device */
+           }
+      #+END_SRC
+   2. f_desc_table 记录了所有打开的文件,它是所有用户进程共享的. 其成员结构如下
+      #+BEGIN_SRC c
+      struct file_desc {
+          int     fd_mode;    /**< R or W */
+          int     fd_pos;     /**< Current position for R/W. */
+          struct inode*   fd_inode;   /**< Ptr to the i-node */
+      }
+      #+END_SRC
+   3. inode_table 用于缓存磁盘上文件的元数据. 其成员结构如下:
+      #+BEGIN_SRC c
+           struct inode {
+                   u32 i_mode;     /**< Accsess mode */
+                   u32 i_size;     /**< File size */
+                   u32 i_start_sect;   /**< The first sector of the data */
+                   u32 i_nr_sects; /**< How many sectors the file occupies */
+                   u8  _unused[16];    /**< Stuff for alignment */
+
+      /* the following items are only present in memory */
+                   int i_dev;
+                   int i_cnt;      /**< How many procs share this inode  */
+                   int i_num;      /**< inode nr.  */
+           }
+      #+END_SRC
+   4. 进程PCB中有的filp是一个file_desc类型的指针数组,其成员指向公共的f_desc_table中的成员.
+      用户进程调用open返回的fd即为自己PCB中filp数组的下标.
+2. 向硬盘驱动task_hd任务发送DEV_OPEN消息. 硬盘驱动收到消息后会读取硬盘分区表,并做简单初始化
+3. mkfs: 主要是在磁盘上初始化文件系统相关的结构.
+   1. 初始化super block, inode map, sector map, inode array
+   2. 创建文件root node对应根目录/
+   3. 创建TTY文件dev_tty1~n. TTY和普通文件的区别在于不占用磁盘空间,并有特殊标志位.
+4. 将3中写入磁盘的文件系统元数据读入缓存,方便进行文件操作
+** 打开/创建文件
+1. 在用户进程的PCB.flip数组中找到一个空位fd
+2. 在公共的f_desc_table数组中找到一个空位i
+3. 查找或创建文件: 这一步主要是维护文件系统的元数据
+4. PCB.filp[fd] = &f_desc_table[i]
+5. f_desc_table[i] = 步骤3中返回的inode
+** 读写文件
+1. 根据PCB.filp[fd]找到要读写的inode
+2. 根据inode的类型, 发送消息给相应的驱动进程(具体参考HD和TTY)
+

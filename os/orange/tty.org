@@ -1,0 +1,199 @@
+#+OPTIONS: ^:nil
+* 概述
+TTY可以看做是一种设备,输入是键盘,输出是显示器.多个TTY是共享键盘和显示器的.
+1. 显示器
+   1. 默认模式下(80*25文本模式), 显存大小为32KB, 范围为0xB8000~0xBFFFF
+   2. 2个字节表示一个字符, 80*25=2000, 即每屏只需要4KB, 所以多个tty可以共享显示器
+   3. 显示器提供了相关寄存器来控制光标位置,显示地址等. 比如可以控制显示器显示0xB9000处的字符
+   4. 对用户来说, 通常光标所在的位置就是当前TTY. 切换不同的TTY其实是显示显存的不同位置而已.
+2. 键盘
+   1. 每次发生键盘中断时(用户按下键盘时),键盘中断例程将输入读入键盘缓冲区
+   2. 当一个TTY要读取用户的键盘输入时,先要判断它是否是当前TTY,只有当前TTY才可以读取键盘输入.
+   3. 当用户通过键盘切换TTY时, 需要选出新的当前TTY, 并使显示器显示新的TTY
+3. TTY设备与FS的交互
+   1. FS进程通过抽象为TTY和文件提供统一的接口,用户进程通过FS与设备驱动进程交互
+   2. TTY读请求处理
+      1. 先记录请求参数,并阻塞用户进程(注意不是阻塞FS进程)
+      2. 等读取到足够的键盘输入并copy到用户进程指定的位置后,再发消息给FS解除用户进程的阻塞
+   3. 其他请求直接处理
+* 实现分析
+** 键盘中断例程
+   #+BEGIN_SRC c
+PUBLIC void keyboard_handler(int irq)
+{
+	u8 scan_code = in_byte(KB_DATA);
+
+	if (kb_in.count < KB_IN_BYTES) {
+		*(kb_in.p_head) = scan_code;
+		kb_in.p_head++;
+		if (kb_in.p_head == kb_in.buf + KB_IN_BYTES)
+			kb_in.p_head = kb_in.buf;
+		kb_in.count++;
+	}
+
+	key_pressed = 1;
+}
+struct kb_inbuf {
+	char*	p_head;			/* 指向缓冲区中下一个空闲位置 */
+	char*	p_tail;			/* 指向键盘任务应处理的字节 */
+	int	count;			/* 缓冲区中共有多少字节 */
+	char	buf[KB_IN_BYTES];	/* 缓冲区 */
+};
+   #+END_SRC
+可以看出键盘中断例程只是简单的将键盘输入读入键盘缓冲区
+** 主要数据结构
+1. TTY结构中的缓存区对应键盘, 而console对应显示器
+2. TTY中剩余的成员用于记录请求读取TTY设备的进程信息和请求参数
+#+BEGIN_SRC c
+typedef struct s_tty
+{
+	u32	ibuf[TTY_IN_BYTES];	/* TTY input buffer */
+	u32*	ibuf_head;		/* the next free slot */
+	u32*	ibuf_tail;		/* the val to be processed by TTY */
+	int	ibuf_cnt;		/* how many */
+
+	int	tty_caller;   /* who called, usually FS */
+	int	tty_procnr;   /* who wants the chars */
+	void*	tty_req_buf;/* where the chars should be put */
+	int	tty_left_cnt;/* how many chars are requested */
+	int	tty_trans_cnt;/* how many chars have been transferred */
+
+	struct s_console *	console;
+}TTY;
+typedef struct s_console
+{
+	unsigned int	crtc_start; /* set CRTC start addr reg */
+	unsigned int	orig;	    /* start addr of the console */
+	unsigned int	con_size;   /* how many words does the console have */
+	unsigned int	cursor;
+	int		is_full;
+}CONSOLE;
+#+END_SRC
+** TTY任务主循环
+1. 首先轮询所有TTY,进行基本的处理
+   1. tty_dev_read
+      1. 判断参数指定的TTY是否当前TTY
+      2. 如果是则从键盘缓冲区读字符到TTY缓冲区
+   2. tty_dev_write
+      1. 将TTY缓冲区中的字符写到对应的console
+      2. 如果字符数满足了请求进程的要求(tty_left_cnt),向FS进程(tty_caller)发送RESUME_PROC消息
+#+BEGIN_SRC c
+PRIVATE void tty_dev_read(TTY* tty)
+{
+	if (is_current_console(tty->console))
+		keyboard_read(tty);
+}
+
+
+/*****************************************************************************
+ *                                tty_dev_write
+ *****************************************************************************/
+/**
+ * Echo the char just pressed and transfer it to the waiting process.
+ * 
+ * @param tty   Ptr to a TTY struct.
+ *****************************************************************************/
+PRIVATE void tty_dev_write(TTY* tty)
+{
+	while (tty->ibuf_cnt) {
+		char ch = *(tty->ibuf_tail);
+		tty->ibuf_tail++;
+		if (tty->ibuf_tail == tty->ibuf + TTY_IN_BYTES)
+			tty->ibuf_tail = tty->ibuf;
+		tty->ibuf_cnt--;
+
+		if (tty->tty_left_cnt) {
+			if (ch >= ' ' && ch <= '~') { /* printable */
+				out_char(tty->console, ch);
+				void * p = tty->tty_req_buf +
+					   tty->tty_trans_cnt;
+				phys_copy(p, (void *)va2la(TASK_TTY, &ch), 1);
+				tty->tty_trans_cnt++;
+				tty->tty_left_cnt--;
+			}
+			else if (ch == '\b' && tty->tty_trans_cnt) {
+				out_char(tty->console, ch);
+				tty->tty_trans_cnt--;
+				tty->tty_left_cnt++;
+			}
+
+			if (ch == '\n' || tty->tty_left_cnt == 0) {
+				out_char(tty->console, '\n');
+				MESSAGE msg;
+				msg.type = RESUME_PROC;
+				msg.PROC_NR = tty->tty_procnr;
+				msg.CNT = tty->tty_trans_cnt;
+				send_recv(SEND, tty->tty_caller, &msg);
+				tty->tty_left_cnt = 0;
+			}
+		}
+	}
+}
+#+END_SRC
+2. 接收新的请求
+   1. DEV_OPEN 只做简单的应答
+   2. DEV_READ
+      1. 如果直接处理请求需要等待用户输入,会影响效率
+      2. 记录用户的请求参数,向FS进程返回SUSPEND_PROC消息
+      3. FS进程收到SUSPEND_PROC消息后会阻塞用户进程(其实只是简单的不回用户进程消息)
+      4. 等到用户输入满足了请求,再通过tty_dev_write中的RESUME_PROC消息恢复用户进程
+   3. DEV_WRITE 将消息中的内容写到console并应答
+   4. HARD_INT
+      1. 如果FS进程一直不发送请求,TTY驱动会阻塞在接收消息处,影响TTY读键盘缓冲区
+      2. 每次产生时钟中断且key_pressed为1时,向TTY驱动发送HARD_INT消息,来"唤醒"TTY
+      3. TTY收到消息后重置key_pressed
+      4. 每次发生键盘中断时置key_pressed为1, 结合2和3,相当于每次按下键盘时唤醒TTY
+#+BEGIN_SRC c
+PUBLIC void task_tty()
+{
+	TTY *	tty;
+	MESSAGE msg;
+
+	init_keyboard();
+
+	for (tty = TTY_FIRST; tty < TTY_END; tty++)
+		init_tty(tty);
+
+	select_console(0);
+
+	while (1) {
+		for (tty = TTY_FIRST; tty < TTY_END; tty++) {
+			do {
+				tty_dev_read(tty);
+				tty_dev_write(tty);
+			} while (tty->ibuf_cnt);
+		}
+
+		send_recv(RECEIVE, ANY, &msg);
+
+		int src = msg.source;
+		assert(src != TASK_TTY);
+
+		TTY* ptty = &tty_table[msg.DEVICE];
+
+		switch (msg.type) {
+		case DEV_OPEN:
+			reset_msg(&msg);
+			msg.type = SYSCALL_RET;
+			send_recv(SEND, src, &msg);
+			break;
+		case DEV_READ:
+			tty_do_read(ptty, &msg);
+			break;
+		case DEV_WRITE:
+			tty_do_write(ptty, &msg);
+			break;
+		case HARD_INT:
+			/**
+			 * waked up by clock_handler -- a key was just pressed
+			 * @see clock_handler() inform_int()
+			 */
+			key_pressed = 0;
+			continue;
+		default:
+			dump_msg("TTY::unknown msg", &msg);
+			break;
+		}
+	}
+}
+#+END_SRC

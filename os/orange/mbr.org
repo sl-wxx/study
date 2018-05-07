@@ -1,0 +1,19 @@
+* MBR分区
+** 整个硬盘的首扇区
+1. 硬盘第一个扇区叫做MBR(Master Boot Sector)
+2. MBR的前446字节属于Bootstrap code area
+3. 接下来的4*16字节存放分区表, 对应4个主分区
+4. 最后2个字节固定为55AA,表示boot signature
+** 各个分区的首扇区
+1. 每个分区的首扇区叫做VBR(volume boot record)
+2. The code in volume boot records is invoked either directly by the machine's firmware or indirectly by code in the master boot record or a boot manager.
+3. Invoking a VBR via a boot manager is known as chain loading.
+** Grub
+1. Grub被安装在MBR和紧随其后的扇区中.
+2. 用户可以通过Grub选择将哪个分区的VBR装载到0x7c00
+3. VBR中的引导代码再完成后续的操作系统启动
+* GPT分区
+1. GPT(GUID Partition Table)是UEFI(Unified Extensible Firmware Interface)标准的一部分.
+2. GPT被写在硬盘的第二个扇区处,第一个扇区仍然为MBR.
+   1. Protective MBR: 将保留下来的MBR用于防止MBR工具错误地把第一个扇区作为MBR操作,破坏分区表.
+   2. Hybrid MBR: 将能识别GPT的引导程序(比如Grub2)放入MBR,从而兼容老的BIOS.
