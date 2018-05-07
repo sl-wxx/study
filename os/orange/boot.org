@@ -1,4 +1,13 @@
-* 概述
+#+OPTIONS: ^:nil
+* 操作系统安装
+** 通常情况
+1. 首先需要一张系统盘, 存储介质可能是光盘/USB/软盘等.
+2. 设置BIOS从系统盘启动.
+3. 系统盘内有相关程序可以读取/修改分区表,并让用户选择将操作系统安装到哪个分区.
+4. 随后系统盘内的安装程序会向用户选择的分区写入VBR, 建立文件系统并将系统文件copy到分区内.
+5. 最后从硬盘分区的VBR重新启动电脑,即可正常使用.
+** Orange简化情况
+为了简单orange没有提供读取/修改分区表的功能,而是事先计算好相应的值并写死在程序里.
 1. 准备
    1. 准备一张软盘,并将boot.bin, loader.bin和kernel.bin写入
    2. 将hdboot.bin写入硬盘某个分区的首扇区(VBR)
@@ -8,37 +17,39 @@
    2. 进入kernel后, FS进程会执行mkfs()来初始化orange FS, 即在硬盘上写入FS相关元数据.
    3. 解压inst.tar到硬盘上,并维护FS相关的元数据.
 3. 重启并通过硬盘相应分区的VBR启动
-   1. hdboot会根据软盘启动时写入的FS元数据信息,从硬盘查找并加载hdldr
-   2. hdldr同样从硬盘查找并加载kernel,然后系统就可以正常使用了.
+   1. hdboot位于VBR内,由BIOS加载并执行
+   2. hdboot会根据软盘启动时写入的FS元数据信息,从硬盘查找加载hdldr.bin并执行
+   3. hdldr同样从硬盘查找加载kernel并执行.
+   4. kernel会根据软盘启动时留下的标记判断出不需要重新建立文件系统.
+   5. 新系统启动完成.
+
 * 软盘启动
 ** boot.asm
 1. 被BIOS加载到物理地址0x7c00
-2. 从软盘查找并加载loader.bin
-3. 跳入loader.bin
-** loader.asm
-1. 被加载到物理地址0x90100
-2. 定义GDT和GdtPtr. GDT包括三个段:代码段,数据段和显存段.其中代码段和数据段是扁平的(0-4G)
-3. 获取可用的内存范围
-4. 从软盘查找并读取kernel.bin到物理地址70000h处
-5. 将硬盘引导扇区内容读到0x500h处
-6. 进入保护模式(加载GDTR, 关中断, 打开A20地址线, cr0的最低位置1, 最后通过jmp指令进入保护模式)
-7. 开启分页机制(SetUpPaging)
-8. 按照ELF格式,重新放置kernel.bin(链接生成kernel.bin时,指定了-Ttext=0x1000)
-9. 初始化位于0x900处的BOOT_PARAM_ADDR.
-   该处依次存放魔数, 最大的连续可用内存数, 和kernel.bin实际被加载到的地址(0x70000)
-10. 跳入内核执行
+2. 从软盘查找并加载loader.bin到0x90100处
+3. 跳入loader执行
+
 * 硬盘启动
 ** hdboot.asm
 1. 被BIOS加载到物理地址0x7c00
-2. 从ROOT_BASE指定的硬盘地址处,读取super_block到(0x700)
-3. 
-4. 读取软盘启动时初始化好的FS元数据(super_block等)来查找hdldr.bin
-5. 将hdldr.bin加载到内存并跳入执行
-** hdldr.asm
+2. 定义disk_address_packet结构,用于读取硬盘
+3. 读取软盘启动时初始化好的FS元数据(super_block等)来查找hdldr.bin
+   1. 从ROOT_BASE指定的硬盘地址(Logical Block Address)处,读取super_block到内存地址0x700
+   2. 将hdldr.bin从硬盘读到内存0x90100处
+4. 跳入loader执行
 
+* Loader
+1. 定义GDT和GdtPtr. GDT包括三个段:代码段,数据段和显存段.其中代码段和数据段是扁平的(0-4G)
+2. 从硬盘/软盘查找kernel.bin并将其加载到70000h处
+3. 进入保护模式(加载GDTR, 关中断, 打开A20地址线, cr0的最低位置1, 最后通过jmp指令进入保护模式)
+4. 开启分页机制(SetUpPaging)
+5. 按照ELF格式,重新放置kernel.bin(链接生成kernel.bin时,指定了-Ttext=0x1000)
+6. 初始化位于0x900处的BOOT_PARAM_ADDR.
+   该处依次存放魔数, 最大的连续可用内存数, 和kernel.bin实际被加载到的地址(0x70000)
+7. 跳入内核执行
 
 * 内核
-* kernel.asm
+** Kernel.asm
 1. 根据ELF默认定义,从_start处开始执行
 2. 将esp指向kernel.bin的bss段中
 3. sgdt [gdt_ptr]
@@ -53,30 +64,39 @@
          1. 0-32号中断是intel定义的,32-255号中断可以由用户自定义
          2. 32-47号中断被设置为调用irq_table[中断号-32], 0x90号中断对应sys_call
          3. 这里由于主片和从片的EOI操作不同,所以使用了hwint_master和hwint_slave两个宏
-      3. 初始化tss, 设置ring0的ss为SELECTOR_KERNEL_DS; 并添加tss描述符到gdt
-      4. 为每个任务或用户进程添加一个ldt描述符到gdt,并将ldt的基址统一设置为SELECTOR_KERNEL_DS
+      3. 初始化tss: 设置ring0的ss为SELECTOR_KERNEL_DS并添加tss描述符到gdt
+      4. 初始化proc_table
+         1. 为每个任务或用户进程添加一个ldt描述符到gdt,并将ldt_sel指向ldt描述符.
+         2. ldt的基址统一设置为SELECTOR_KERNEL_DS
 5. lgdt [gdt_ptr]
 6. lidt [idt_ptr]
 7. 通过一个跳转指令使刚刚加载的gdt生效
 8. 加载之前初始化的tss
 9. jmp kernel_main
-* main.c
-1. 根据task_table和user_proc_table中的内容初始化proc_table中保存的PROCESS结构
-   1. p_name, regs.eip从task结构中相应域copy
-   2. 递增设置pid, idt_sel, regs.esp
-   3. ldts =[0]= = gdt[SELECTOR_KERNEL_CS], ldts =[1]= = gdt[SELECTOR_KERNEL_DS]
-   4. regs.cs对应自己的ldts =[0]= 即: SELECTOR_KERNEL_CS;
-   5. regs.ds/es/fs/ss都对应自己的ldts =[1]= , 即: SELECTOR_KERNEL_DS
-   6. regs.gs对应gdt中的SELECTOR_KERNEL_GS
-   7. IPC相关的域, 如p_msg, p_sendto均设为null
-   8. 打开的文件指针数组filp的每个成员也设为null
-   9. k_reenter=0, p_proc_ready=proc_table
-2. 调用clock.c的init_clock()
+
+** Main.c
+1. 根据task_table和user_proc_table中的内容初始化proc_table中保存的proc结构
+   1. 索引超出task_table和user_proc_table的proc_table元素用于动态创建进程,标记其p_flags=FREE_SLOT
+   2. p_name, regs.eip从task结构中相应域copy
+   3. 递增设置pid, regs.esp
+   4. p_flags设置为0,表示RUNNING
+   5. Init进程
+      1. 由于Init进程的空间在每次fork时都会被复制一份,所以不能用0-4G的扁平空间
+      2. Init进程使用kernel.bin按ELF格式加载后所在位置和大小来初始化其ldt
+   6. 段寄存器
+      1. ldts =[0]= = gdt[SELECTOR_KERNEL_CS], ldts =[1]= = gdt[SELECTOR_KERNEL_DS]
+      2. regs.cs对应自己的ldts =[0]= 
+      3. regs.ds/es/fs/ss都对应自己的ldts =[1]= 
+      4. regs.gs对应gdt中的SELECTOR_KERNEL_GS
+   7. IPC相关的域均设为null, 包括p_msg, p_sendto, p_recvfrom, has_int_msg, q_sending, next_sending
+   8. 文件相关: 打开的文件指针数组filp的每个成员也设为null
+2. k_reenter=0, p_proc_ready=proc_table
+3. 调用clock.c的init_clock()
    1. disable_irq(CLOCK_IRQ)
    2. irq_table[CLOCK_IRQ] = clock_handler
    3. enable_irq(CLOCK_IRQ)
-3. 调用keyboard.c的init_keyboard(): 类似init_clock,irq_table[KEYBOARD_IRQ] = keyboard_handler
-4. 调用restart()
+4. 调用keyboard.c的init_keyboard(): 类似init_clock,irq_table[KEYBOARD_IRQ] = keyboard_handler
+5. 调用restart()
    #+BEGIN_SRC asm
 restart:
        mov esp, [p_proc_ready]
@@ -93,4 +113,4 @@ restart_reenter:
        add esp, 4
        iretd
    #+END_SRC
-5. while(1) {}
+6. while(1) {}
