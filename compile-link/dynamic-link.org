@@ -1,0 +1,183 @@
+* 概述
+1. 静态链接的缺点
+   1. 每个可执行文件都要包含公共的库而不能共享,导致磁盘和内存的浪费
+   2. 任何一个模块的更新都要重新进行链接,不利于软件的更新
+2. 动态链接的基本思想是将共享库映射到多个进程的地址空间以实现共享
+   1. 动态共享库 (-shared): 在链接时生成的虚拟地址都从0开始, 到装载时才真正决定共享库的加载地址
+   2. 地址无关代码 (-fPIC): 将共享的指令段中会随加载地址变化的部分剥离出来,放到非共享的数据段中
+      1. 调用模块内部函数/跳转:
+         1. 使用相对偏移调用指令
+         2. 实际上由于全局符号介入,模块内部函数可能被模块外部的函数覆盖,需要使用3的方式处理
+      2. 访问模块内部定义的数据, 如模块中定义的全局变量/静态变量
+         1. 先获得PC值. PC值加一个固定的偏移量即可.
+         2. 实际上编译器无法判断引用的是模块内部的变量还是模块外部的变量,需要按4的方式处理
+      3. 调用模块外部的函数/跳转
+         1. 与4中方式基本相同
+      4. 访问模块外部的数据, 其他模块定义的全局变量
+         1. 在数据段中建立指向变量的指针数据GOT(Global Offset Table)
+         2. 将数据引用地址设置为其在GOT中的偏移地址
+         3. 由于GOT和当前访问数据的指令的相对位置是确定的, 通过PC可以获取到GOT
+         4. 再通过GOT[数据在GOT中的偏移]获取到指向数据地址的指针,进而访问数据
+   3. 延迟绑定
+      1. 动态链接需要在加载时进行重定位,会影响程序的启动速度
+      2. 延迟绑定可以在函数第一次被调用时才进行重定位,以提高程序加载速度
+   4. 注意: 同一模块映射到不同进程的地址空间是不同的. (cat /proc/PID/maps)
+* 实际步骤
+   1. 动态链接器自举
+      1. 动态链接器不能引用其他库
+      2. 动态链接器必须自己完成自己的重定位工作
+      3. 动态链接器本身是静态链接的, 并且是地址无关的(PIC)
+   2. 装载共享对象
+      1. 依次加载依赖的共享库,并把共享库中的符号合并到全局符号表
+      2. 如果存在相同名称的符号,先加载的会覆盖后加载的----全局符号介入
+   3. 重定位和初始化
+      1. 根据全局符号表,对GOT中的位置进行重定位
+      2. 执行共享库的.init段
+      3. 可执行文件的.init段并不会由动态链接器执行,而是由程序初始化部分的代码执行
+* 主要段说明
+这里以Lib.so为例, 进行分析.
+1. 符号表: 主要记录了符号所在的段及段内偏移
+   1. .symtab 符号表,包含所有符号
+   2. .dynsym 动态链接符号表, 只包含动态链接相关的符号, 是.symtab的子集
+2. .dynamic
+   1. 记录了依赖哪些共享库,动态链接符号表/重定位表位置,共享对象初始化代码地址等.
+   2. readelf --dynamic Lib.so
+      |                Tag | Type      |                   Name/Value | 说明                 |
+      |--------------------+-----------+------------------------------+----------------------|
+      | 0x0000000000000001 | (NEEDED)  | Shared  library: [libc.so.6] | 依赖的共享库         |
+      | 0x000000000000000c | (INIT)    |                        0x548 | 初始化代码地址       |
+      | 0x000000000000000d | (FINI)    |                        0x6c4 | 结束代码地址         |
+      | 0x0000000000000005 | (STRTAB)  |                        0x380 | .dynstr地址          |
+      | 0x0000000000000006 | (SYMTAB)  |                        0x230 | .dynsym地址          |
+      | 0x000000000000000a | (STRSZ)   |                 177  (bytes) | .dynstr大小          |
+      | 0x0000000000000007 | (RELA)    |                        0x470 | 动态链接重定位表地址 |
+      | 0x0000000000000008 | (RELASZ)  |                 192  (bytes) | 动态链接重定位表大小 |
+      | 0x0000000000000009 | (RELAENT) |                  24  (bytes) | 动态重定位入口数量   |
+3. 重定位表
+   1. .rel/.rela+段名. 如plt段重定位表: .rela.plt
+   2. .rela.dyn: .got和数据段的重定位表, 对应数据引用的重定位(如果没有使用PIC模式,也可能对应函数重定位)
+   3. .rela.plt: .got.plt的重定位表, 对应函数引用的重定位
+   4. readelf --relocs Lib.so
+      #+begin_example
+Relocation section '.rela.dyn' at offset 0x470 contains 8 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000200e00  000000000008 R_X86_64_RELATIVE                    670
+000000200e08  000000000008 R_X86_64_RELATIVE                    630
+000000201020  000000000008 R_X86_64_RELATIVE                    201020
+000000200fd8  000200000006 R_X86_64_GLOB_DAT 0000000000000000 _ITM_deregisterTMClone + 0
+000000200fe0  000400000006 R_X86_64_GLOB_DAT 0000000000000000 __gmon_start__ + 0
+000000200fe8  000500000006 R_X86_64_GLOB_DAT 0000000000000000 _Jv_RegisterClasses + 0
+000000200ff0  000600000006 R_X86_64_GLOB_DAT 0000000000000000 _ITM_registerTMCloneTa + 0
+000000200ff8  000700000006 R_X86_64_GLOB_DAT 0000000000000000 __cxa_finalize@GLIBC_2.2.5 + 0
+
+Relocation section '.rela.plt' at offset 0x530 contains 1 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000201018  000300000007 R_X86_64_JUMP_SLO 0000000000000000 printf@GLIBC_2.2.5 + 0
+      #+end_example
+      1. Offset表示需要进行重定位的位置的虚拟地址.
+      2. Info的高24位表示重定位入口的符号在符号表中的下标
+         重定位表的段表描述符section-header.link记录了该重定位表使用哪个符号表
+4. .got / .got.plt: 存放代码段中剥离出的变化部分, 在重定位时将其修改为实际值.
+5. .plt / .plt.got: 存放一些辅助代码(实现懒加载等)
+  
+* 显式运行时链接
+1. dlopen(): 打开一个动态库,并加载到进程的地址空间,完成其初始化过程.
+2. dlsym(): 查找符号. 如果符号是函数或变量返回其地址, 如果是常量返回常量值.
+3. dlerror(): 用于判断之前的操作是否成功.
+4. dlclose(): 执行finit, 取消模块文件和进程地址的映射,关闭模块文件.
+
+* 实例分析
+** C源码
+   #+BEGIN_SRC c
+// ------------Lib.h-------------
+#ifndef LIB_H
+#define LIB_H
+
+void foobar(int i);
+
+#endif
+// -------------------------------
+
+// ------------Lib.c-------------
+#include <stdio.h>
+
+void foobar(int i) {
+    printf("Printing from Lib.so %d\n", i);
+}
+// -------------------------------
+
+// ------------Program1.c-------------
+#include "Lib.h"
+
+int main() {
+    foobar(1);
+    return 0;
+}
+// -------------------------------
+
+// ------------Program2.c-------------
+#include "Lib.h"
+
+int main() {
+    foobar(2);
+    return 0;
+}
+// -------------------------------
+
+   #+END_SRC
+
+
+** printf调用分析
+1. 代码段 .text
+   #+BEGIN_SRC asm
+00000000000006a0 <foobar>:
+	6a0:   55                      push   %rbp
+	6a1:   48 89 e5                mov    %rsp,%rbp
+	6a4:   48 83 ec 10             sub    $0x10,%rsp
+	6a8:   89 7d fc                mov    %edi,-0x4(%rbp)
+	6ab:   8b 45 fc                mov    -0x4(%rbp),%eax
+	6ae:   89 c6                   mov    %eax,%esi
+	6b0:   48 8d 3d 16 00 00 00    lea    0x16(%rip),%rdi        # 6cd <_fini+0x9>
+	6b7:   b8 00 00 00 00          mov    $0x0,%eax
+	6bc:   e8 bf fe ff ff          callq  580 <printf@plt>
+	6c1:   90                      nop
+	6c2:   c9                      leaveq 
+	6c3:   c3                      retq   
+   #+END_SRC
+2. .plt段: 1中callq指令的地址位于.plt段中.
+   #+BEGIN_SRC asm
+0000000000000580 <printf@plt>:
+	580:   ff 25 92 0a 20 00       jmpq   *0x200a92(%rip)      # 201018 <_GLOBAL_OFFSET_TABLE_+0x18>
+	586:   68 00 00 00 00          pushq  $0x0
+	58b:   e9 e0 ff ff ff          jmpq   570 <_init+0x28>
+   #+END_SRC
+   1. 第一个jmpq指令的地址201018h位于.got.plt段,存放的是下一条指令pushq的地址0586h. 如下:
+      #+begin_example
+;; objdump --full-contents --section=.got.plt Lib.so
+
+Contents of section .got.plt:
+   201000: 180e2000 00000000 00000000 00000000  .. .............
+   201010: 00000000 00000000 86050000 00000000  ................
+      #+end_example
+   2. pushq 后的$0x0 表示的是符号在重定位表中的下标. 如下:
+      #+begin_example
+;; readelf --relocs Lib.so
+
+Relocation section '.rela.plt' at offset 0x530 contains 1 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000201018  000300000007 R_X86_64_JUMP_SLO 0000000000000000 printf@GLIBC_2.2.5 + 0
+
+;; 可以看出符号在重定位表中的Offset对应的恰好是其在.got.plt中的位置201018h
+      #+end_example
+   3. 第二个jmpq指令的地址位于.plt中. 如下
+      #+BEGIN_SRC asm
+0000000000000570 <printf@plt-0x10>:
+	570:   ff 35 92 0a 20 00       pushq  0x200a92(%rip)        # 201008 <_GLOBAL_OFFSET_TABLE_+0x8>
+	576:   ff 25 94 0a 20 00       jmpq   *0x200a94(%rip)       # 201010 <_GLOBAL_OFFSET_TABLE_+0x10>
+	57c:   0f 1f 40 00             nopl   0x0(%rax)         
+      #+END_SRC
+      1. 这里的jmpq指令会将控制权转移给动态链接器.
+      2. got表的第二项和之前的重定位表下标一起作为函数的参数
+      3. 该函数会查找符号的实际地址并放入重定位表的Offset地址201018h处.
+      4. 第二次再调用printf时,将直接跳转到201018h处的实际地址,不需要再进行重定位.
+      5. 这样就实现了懒加载.
