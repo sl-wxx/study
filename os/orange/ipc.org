@@ -64,12 +64,25 @@ PUBLIC int send_recv(int function, int src_dest, MESSAGE* msg)
 #+END_SRC
 ** 系统调用接口
 #+BEGIN_SRC asm
+; ====================================================================================
+;                  sendrec(int function, int src_dest, MESSAGE* msg);
+; ====================================================================================
+; Never call sendrec() directly, call send_recv() instead.
 sendrec:
+	push	ebx		; .
+	push	ecx		;  > 12 bytes
+	push	edx		; /
+
 	mov	eax, _NR_sendrec
-	mov	ebx, [esp + 4]	; function
-	mov	ecx, [esp + 8]	; src_dest
-	mov	edx, [esp + 12]	; p_msg
+	mov	ebx, [esp + 12 +  4]	; function
+	mov	ecx, [esp + 12 +  8]	; src_dest
+	mov	edx, [esp + 12 + 12]	; msg
 	int	INT_VECTOR_SYS_CALL
+
+	pop	edx
+	pop	ecx
+	pop	ebx
+
 	ret
 
 sys_call:
@@ -195,6 +208,12 @@ PRIVATE int msg_send(struct proc* current, int dest, MESSAGE* m)
 	}
 
 	return 0;
+}
+
+PRIVATE void block(struct proc* p)
+{
+	assert(p->p_flags);
+	schedule();
 }
 #+END_SRC 
 

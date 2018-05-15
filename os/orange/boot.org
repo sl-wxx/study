@@ -45,7 +45,7 @@
 4. 开启分页机制(SetUpPaging)
 5. 按照ELF格式,重新放置kernel.bin(链接生成kernel.bin时,指定了-Ttext=0x1000)
 6. 初始化位于0x900处的BOOT_PARAM_ADDR.
-   该处依次存放魔数, 最大的连续可用内存数, 和kernel.bin实际被加载到的地址(0x70000)
+   该处依次存放魔数, 最大的连续可用内存数, 和kernel.bin的地址(0x70000处, 注意不是ELF加载位置)
 7. 跳入内核执行
 
 * 内核

@@ -1,6 +1,5 @@
 #+OPTIONS: ^:nil
-* 源码
-** 文件系统主循环
+* 文件系统主循环
 1. task_fs作为一个任务并不需要先于用户进程启动,因为用户进程发送的消息会保存到task_fs的PCB中
 2. task_fs中的文件可以是磁盘上的文件,也可以是特殊字符设备TTY
 #+BEGIN_SRC c
@@ -32,6 +31,18 @@ PUBLIC void task_fs()
 		case RESUME_PROC:
 			src = fs_msg.PROC_NR;
 			break;
+		case FORK:
+			fs_msg.RETVAL = fs_fork();
+			break;
+		case EXIT:
+			fs_msg.RETVAL = fs_exit();
+			break;
+		case LSEEK:
+			fs_msg.OFFSET = do_lseek();
+			break;
+		case STAT:
+			fs_msg.RETVAL = do_stat();
+			break;
 		default:
 			dump_msg("FS::unknown message:", &fs_msg);
 			assert(0);
@@ -45,7 +56,7 @@ PUBLIC void task_fs()
 	}
 }
 #+END_SRC
-** 初始化
+* 初始化
 #+BEGIN_SRC c
 PRIVATE void init_fs()
 {
@@ -71,8 +82,14 @@ PRIVATE void init_fs()
 	assert(dd_map[MAJOR(ROOT_DEV)].driver_nr != INVALID_DRIVER);
 	send_recv(BOTH, dd_map[MAJOR(ROOT_DEV)].driver_nr, &driver_msg);
 
-	/* make FS */
-	mkfs();
+	/* read the super block of ROOT DEVICE */
+	RD_SECT(ROOT_DEV, 1);
+
+	sb = (struct super_block *)fsbuf;
+	if (sb->magic != MAGIC_V1) {
+		printl("{FS} mkfs\n");
+		mkfs(); /* make FS */
+	}
 
 	/* load super block of ROOT */
 	read_super_block(ROOT_DEV);
@@ -111,8 +128,9 @@ PRIVATE void init_fs()
       struct file_desc {
           int     fd_mode;    /**< R or W */
           int     fd_pos;     /**< Current position for R/W. */
+          int     fd_cnt;     /**< How many procs share this desc */
           struct inode*   fd_inode;   /**< Ptr to the i-node */
-      }
+      };
       #+END_SRC
    3. inode_table 用于缓存磁盘上文件的元数据. 其成员结构如下:
       #+BEGIN_SRC c
@@ -129,21 +147,356 @@ PRIVATE void init_fs()
                    int i_num;      /**< inode nr.  */
            }
       #+END_SRC
-   4. 进程PCB中有的filp是一个file_desc类型的指针数组,其成员指向公共的f_desc_table中的成员.
+   4. 进程PCB中的filp是一个file_desc类型的指针数组,其成员指向公共的f_desc_table中的成员.
       用户进程调用open返回的fd即为自己PCB中filp数组的下标.
-2. 向硬盘驱动task_hd任务发送DEV_OPEN消息. 硬盘驱动收到消息后会读取硬盘分区表,并做简单初始化
-3. mkfs: 主要是在磁盘上初始化文件系统相关的结构.
-   1. 初始化super block, inode map, sector map, inode array
-   2. 创建文件root node对应根目录/
-   3. 创建TTY文件dev_tty1~n. TTY和普通文件的区别在于不占用磁盘空间,并有特殊标志位.
-4. 将3中写入磁盘的文件系统元数据读入缓存,方便进行文件操作
-** 打开/创建文件
+2. 向硬盘驱动task_hd任务发送DEV_OPEN消息.
+   1. 硬盘驱动先使用ATA_IDENTIFY命令读取整块硬盘的元数据并放入hd_info[drive].primary =[0]=
+   2. 再读取硬盘分区表,并初始化hd_info[drive]的其他分区信息
+3. ROOT_DEV代表了orange操作系统会被安装到的分区,它的值是事先计算好的
+4. 读取ROOT_DEV分区的第二个扇区(对应super_block, 第一个扇区是VBR)
+5. 如果4中读取的super_block的魔数正确,则认为文件系统已存在,跳过mkfs这一步.
+6. mkfs: 主要是在磁盘上初始化文件系统相关的结构.
+   1. 读取ROOT_DEV分区的base和size
+   2. 初始化super block, 其nr_sects值等于1中得到的size
+   3. 初始化inode map, 其首字节为0x3f, 即: 起始时共有6个文件
+      1. bit 0: reserved
+      2. bit 1: / 根目录
+      3. bit 2,3,4: 分别对应/dev_tty0~2
+      4. bit 5: /cmd.tar
+   4. 初始化sector map: 主要是super_block, inode map和cmd.tar和inode_array占用的扇区
+   5. 初始化inode array: 主要是/,/dev_tty0~2,/cmd.tar 
+   6. TTY和普通文件的区别在于不占用磁盘空间,并有特殊标志位.
+      #+BEGIN_SRC c
+            PRIVATE void mkfs()
+      {
+          MESSAGE driver_msg;
+          int i, j;
+
+          /************************/
+          /*      super block     */
+          /************************/
+          /* get the geometry of ROOTDEV */
+          struct part_info geo;
+          driver_msg.type     = DEV_IOCTL;
+          driver_msg.DEVICE   = MINOR(ROOT_DEV);
+          driver_msg.REQUEST  = DIOCTL_GET_GEO;
+          driver_msg.BUF      = &geo;
+          driver_msg.PROC_NR  = TASK_FS;
+          assert(dd_map[MAJOR(ROOT_DEV)].driver_nr != INVALID_DRIVER);
+          send_recv(BOTH, dd_map[MAJOR(ROOT_DEV)].driver_nr, &driver_msg);
+
+          printl("{FS} dev size: 0x%x sectors\n", geo.size);
+
+          int bits_per_sect = SECTOR_SIZE * 8; /* 8 bits per byte */
+          /* generate a super block */
+          struct super_block sb;
+          sb.magic      = MAGIC_V1; /* 0x111 */
+          sb.nr_inodes      = bits_per_sect;
+          sb.nr_inode_sects = sb.nr_inodes * INODE_SIZE / SECTOR_SIZE;
+          sb.nr_sects   = geo.size; /* partition size in sector */
+          sb.nr_imap_sects  = 1;
+          sb.nr_smap_sects  = sb.nr_sects / bits_per_sect + 1;
+          sb.n_1st_sect     = 1 + 1 +   /* boot sector & super block */
+              sb.nr_imap_sects + sb.nr_smap_sects + sb.nr_inode_sects;
+          sb.root_inode     = ROOT_INODE;
+          sb.inode_size     = INODE_SIZE;
+          struct inode x;
+          sb.inode_isize_off= (int)&x.i_size - (int)&x;
+          sb.inode_start_off= (int)&x.i_start_sect - (int)&x;
+          sb.dir_ent_size   = DIR_ENTRY_SIZE;
+          struct dir_entry de;
+          sb.dir_ent_inode_off = (int)&de.inode_nr - (int)&de;
+          sb.dir_ent_fname_off = (int)&de.name - (int)&de;
+
+          memset(fsbuf, 0x90, SECTOR_SIZE);
+          memcpy(fsbuf, &sb, SUPER_BLOCK_SIZE);
+
+          /* write the super block */
+          WR_SECT(ROOT_DEV, 1);
+
+          printl("{FS} devbase:0x%x00, sb:0x%x00, imap:0x%x00, smap:0x%x00\n"
+                 "        inodes:0x%x00, 1st_sector:0x%x00\n", 
+                 geo.base * 2,
+                 (geo.base + 1) * 2,
+                 (geo.base + 1 + 1) * 2,
+                 (geo.base + 1 + 1 + sb.nr_imap_sects) * 2,
+                 (geo.base + 1 + 1 + sb.nr_imap_sects + sb.nr_smap_sects) * 2,
+                 (geo.base + sb.n_1st_sect) * 2);
+
+          /************************/
+          /*       inode map      */
+          /************************/
+          memset(fsbuf, 0, SECTOR_SIZE);
+          for (i = 0; i < (NR_CONSOLES + 3); i++)
+              fsbuf[0] |= 1 << i;
+
+          assert(fsbuf[0] == 0x3F);/* 0011 1111 :
+                        ,*   || ||||
+                        ,*   || |||`--- bit 0 : reserved
+                        ,*   || ||`---- bit 1 : the first inode,
+                        ,*   || ||              which indicates `/'
+                        ,*   || |`----- bit 2 : /dev_tty0
+                        ,*   || `------ bit 3 : /dev_tty1
+                        ,*   |`-------- bit 4 : /dev_tty2
+                        ,*   `--------- bit 5 : /cmd.tar
+                        ,*/
+          WR_SECT(ROOT_DEV, 2);
+
+          /************************/
+          /*      secter map      */
+          /************************/
+          memset(fsbuf, 0, SECTOR_SIZE);
+          int nr_sects = NR_DEFAULT_FILE_SECTS + 1;
+          /*             ~~~~~~~~~~~~~~~~~~~|~   |
+           ,*                                |    `--- bit 0 is reserved
+           ,*                                `-------- for `/'
+           ,*/
+          for (i = 0; i < nr_sects / 8; i++)
+              fsbuf[i] = 0xFF;
+
+          for (j = 0; j < nr_sects % 8; j++)
+              fsbuf[i] |= (1 << j);
+
+          WR_SECT(ROOT_DEV, 2 + sb.nr_imap_sects);
+
+          /* zeromemory the rest sector-map */
+          memset(fsbuf, 0, SECTOR_SIZE);
+          for (i = 1; i < sb.nr_smap_sects; i++)
+              WR_SECT(ROOT_DEV, 2 + sb.nr_imap_sects + i);
+
+          /* cmd.tar */
+          /* make sure it'll not be overwritten by the disk log */
+          assert(INSTALL_START_SECT + INSTALL_NR_SECTS < 
+                 sb.nr_sects - NR_SECTS_FOR_LOG);
+          int bit_offset = INSTALL_START_SECT -
+              sb.n_1st_sect + 1; /* sect M <-> bit (M - sb.n_1stsect + 1) */
+          int bit_off_in_sect = bit_offset % (SECTOR_SIZE * 8);
+          int bit_left = INSTALL_NR_SECTS;
+          int cur_sect = bit_offset / (SECTOR_SIZE * 8);
+          RD_SECT(ROOT_DEV, 2 + sb.nr_imap_sects + cur_sect);
+          while (bit_left) {
+              int byte_off = bit_off_in_sect / 8;
+              /* this line is ineffecient in a loop, but I don't care */
+              fsbuf[byte_off] |= 1 << (bit_off_in_sect % 8);
+              bit_left--;
+              bit_off_in_sect++;
+              if (bit_off_in_sect == (SECTOR_SIZE * 8)) {
+                  WR_SECT(ROOT_DEV, 2 + sb.nr_imap_sects + cur_sect);
+                  cur_sect++;
+                  RD_SECT(ROOT_DEV, 2 + sb.nr_imap_sects + cur_sect);
+                  bit_off_in_sect = 0;
+              }
+          }
+          WR_SECT(ROOT_DEV, 2 + sb.nr_imap_sects + cur_sect);
+
+          /************************/
+          /*       inodes         */
+          /************************/
+          /* inode of `/' */
+          memset(fsbuf, 0, SECTOR_SIZE);
+          struct inode * pi = (struct inode*)fsbuf;
+          pi->i_mode = I_DIRECTORY;
+          pi->i_size = DIR_ENTRY_SIZE * 5; /* 5 files:
+                            ,* `.',
+                            ,* `dev_tty0', `dev_tty1', `dev_tty2',
+                            ,* `cmd.tar'
+                            ,*/
+          pi->i_start_sect = sb.n_1st_sect;
+          pi->i_nr_sects = NR_DEFAULT_FILE_SECTS;
+          /* inode of `/dev_tty0~2' */
+          for (i = 0; i < NR_CONSOLES; i++) {
+              pi = (struct inode*)(fsbuf + (INODE_SIZE * (i + 1)));
+              pi->i_mode = I_CHAR_SPECIAL;
+              pi->i_size = 0;
+              pi->i_start_sect = MAKE_DEV(DEV_CHAR_TTY, i);
+              pi->i_nr_sects = 0;
+          }
+          /* inode of `/cmd.tar' */
+          pi = (struct inode*)(fsbuf + (INODE_SIZE * (NR_CONSOLES + 1)));
+          pi->i_mode = I_REGULAR;
+          pi->i_size = INSTALL_NR_SECTS * SECTOR_SIZE;
+          pi->i_start_sect = INSTALL_START_SECT;
+          pi->i_nr_sects = INSTALL_NR_SECTS;
+          WR_SECT(ROOT_DEV, 2 + sb.nr_imap_sects + sb.nr_smap_sects);
+
+          /************************/
+          /*          `/'         */
+          /************************/
+          memset(fsbuf, 0, SECTOR_SIZE);
+          struct dir_entry * pde = (struct dir_entry *)fsbuf;
+
+          pde->inode_nr = 1;
+          strcpy(pde->name, ".");
+
+          /* dir entries of `/dev_tty0~2' */
+          for (i = 0; i < NR_CONSOLES; i++) {
+              pde++;
+              pde->inode_nr = i + 2; /* dev_tty0's inode_nr is 2 */
+              sprintf(pde->name, "dev_tty%d", i);
+          }
+          (++pde)->inode_nr = NR_CONSOLES + 2;
+          sprintf(pde->name, "cmd.tar", i);
+          WR_SECT(ROOT_DEV, sb.n_1st_sect);
+      }
+      #+END_SRC
+7. 读取ROOT_DEV分区的super_block并缓存到super_block数组中
+8. 读取并缓存根目录对应的文件
+* 打开/创建文件
 1. 在用户进程的PCB.flip数组中找到一个空位fd
 2. 在公共的f_desc_table数组中找到一个空位i
 3. 查找或创建文件: 这一步主要是维护文件系统的元数据
 4. PCB.filp[fd] = &f_desc_table[i]
 5. f_desc_table[i] = 步骤3中返回的inode
-** 读写文件
+#+BEGIN_SRC c
+PUBLIC int do_open()
+{
+	int fd = -1;		/* return value */
+
+	char pathname[MAX_PATH];
+
+	/* get parameters from the message */
+	int flags = fs_msg.FLAGS;	/* access mode */
+	int name_len = fs_msg.NAME_LEN;	/* length of filename */
+	int src = fs_msg.source;	/* caller proc nr. */
+	assert(name_len < MAX_PATH);
+	phys_copy((void*)va2la(TASK_FS, pathname),
+		  (void*)va2la(src, fs_msg.PATHNAME),
+		  name_len);
+	pathname[name_len] = 0;
+
+	/* find a free slot in PROCESS::filp[] */
+	int i;
+	for (i = 0; i < NR_FILES; i++) {
+		if (pcaller->filp[i] == 0) {
+			fd = i;
+			break;
+		}
+	}
+	if ((fd < 0) || (fd >= NR_FILES))
+		panic("filp[] is full (PID:%d)", proc2pid(pcaller));
+
+	/* find a free slot in f_desc_table[] */
+	for (i = 0; i < NR_FILE_DESC; i++)
+		if (f_desc_table[i].fd_inode == 0)
+			break;
+	if (i >= NR_FILE_DESC)
+		panic("f_desc_table[] is full (PID:%d)", proc2pid(pcaller));
+
+	int inode_nr = search_file(pathname);
+
+	struct inode * pin = 0;
+
+	if (inode_nr == INVALID_INODE) { /* file not exists */
+		if (flags & O_CREAT) {
+			pin = create_file(pathname, flags);
+		}
+		else {
+			printl("{FS} file not exists: %s\n", pathname);
+			return -1;
+		}
+	}
+	else if (flags & O_RDWR) { /* file exists */
+		if ((flags & O_CREAT) && (!(flags & O_TRUNC))) {
+			assert(flags == (O_RDWR | O_CREAT));
+			printl("{FS} file exists: %s\n", pathname);
+			return -1;
+		}
+		assert((flags ==  O_RDWR                     ) ||
+		       (flags == (O_RDWR | O_TRUNC          )) ||
+		       (flags == (O_RDWR | O_TRUNC | O_CREAT)));
+
+		char filename[MAX_PATH];
+		struct inode * dir_inode;
+		if (strip_path(filename, pathname, &dir_inode) != 0)
+			return -1;
+		pin = get_inode(dir_inode->i_dev, inode_nr);
+	}
+	else { /* file exists, no O_RDWR flag */
+		printl("{FS} file exists: %s\n", pathname);
+		return -1;
+	}
+
+	if (flags & O_TRUNC) {
+		assert(pin);
+		pin->i_size = 0;
+		sync_inode(pin);
+	}
+
+	if (pin) {
+		/* connects proc with file_descriptor */
+		pcaller->filp[fd] = &f_desc_table[i];
+
+		/* connects file_descriptor with inode */
+		f_desc_table[i].fd_inode = pin;
+
+		f_desc_table[i].fd_mode = flags;
+		f_desc_table[i].fd_cnt = 1;
+		f_desc_table[i].fd_pos = 0;
+
+		int imode = pin->i_mode & I_TYPE_MASK;
+
+		if (imode == I_CHAR_SPECIAL) {
+			MESSAGE driver_msg;
+			driver_msg.type = DEV_OPEN;
+			int dev = pin->i_start_sect;
+			driver_msg.DEVICE = MINOR(dev);
+			assert(MAJOR(dev) == 4);
+			assert(dd_map[MAJOR(dev)].driver_nr != INVALID_DRIVER);
+			send_recv(BOTH,
+				  dd_map[MAJOR(dev)].driver_nr,
+				  &driver_msg);
+		}
+		else if (imode == I_DIRECTORY) {
+			assert(pin->i_num == ROOT_INODE);
+		}
+		else {
+			assert(pin->i_mode == I_REGULAR);
+		}
+	}
+	else {
+		return -1;
+	}
+
+	return fd;
+}
+#+END_SRC
+* 读写文件
 1. 根据PCB.filp[fd]找到要读写的inode
 2. 根据inode的类型, 发送消息给相应的驱动进程(具体参考HD和TTY)
+3. 写硬盘文件时,可能需要维护文件元数据
+* 进程退出
+#+BEGIN_SRC c
+PRIVATE int fs_exit()
+{
+	int i;
+	struct proc* p = &proc_table[fs_msg.PID];
+	for (i = 0; i < NR_FILES; i++) {
+		if (p->filp[i]) {
+			/* release the inode */
+			p->filp[i]->fd_inode->i_cnt--;
+			/* release the file desc slot */
+			if (--p->filp[i]->fd_cnt == 0)
+				p->filp[i]->fd_inode = 0;
+			p->filp[i] = 0;
+		}
+	}
+	return 0;
+}
+#+END_SRC
+* 进程fork
+#+BEGIN_SRC c
+PRIVATE int fs_fork()
+{
+	int i;
+	struct proc* child = &proc_table[fs_msg.PID];
+	for (i = 0; i < NR_FILES; i++) {
+		if (child->filp[i]) {
+			child->filp[i]->fd_cnt++;
+			child->filp[i]->fd_inode->i_cnt++;
+		}
+	}
+
+	return 0;
+}
+#+END_SRC
 

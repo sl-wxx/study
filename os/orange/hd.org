@@ -117,9 +117,11 @@ struct hd_info
 #+END_SRC
 ** 硬盘设备打开/关闭
 1. 其他进程/任务通过收发消息和硬盘驱动交互, 打开设备对应DEV_OPEN, 关闭对应DEV_CLOSE
-2. 硬盘驱动收到DEV_OPEN消息时,向硬盘发出读元数据的命令,然后阻塞住以等待中断消息
+2. 硬盘驱动收到DEV_OPEN消息时,向硬盘发出读元数据的命令(ATA_IDENTIFY),然后阻塞住以等待中断消息
 3. 硬盘准备好数据后产生硬盘中断触发hd_handler向硬盘驱动进程发送中断消息
-4. 硬盘驱动进程从第2步恢复,读取硬盘准备好的数据并初始化hd_info
+4. 硬盘驱动进程从第2步恢复,读取硬盘准备好的数据并初始化hd_info[drive].primary =[0]=
+5. 注意primary =[0]= 表示的是整个硬盘
+6. 如果是第一次打开该硬盘,读取其分区表并初始化hd_info结构中的分区信息.
 #+BEGIN_SRC c
 PRIVATE void hd_open(int device)
 {

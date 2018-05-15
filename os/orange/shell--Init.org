@@ -1,0 +1,167 @@
+* Init进程
+1. 先在for循环中启动了2个shell进程
+2. 然后在while中不断地调用wait,用于和被过继给自己的子进程的exit配对
+#+BEGIN_SRC c
+void Init()
+{
+	int fd_stdin  = open("/dev_tty0", O_RDWR);
+	assert(fd_stdin  == 0);
+	int fd_stdout = open("/dev_tty0", O_RDWR);
+	assert(fd_stdout == 1);
+
+	printf("Init() is running ...\n");
+
+	/* extract `cmd.tar' */
+	untar("/cmd.tar");
+			
+
+	char * tty_list[] = {"/dev_tty1", "/dev_tty2"};
+
+	int i;
+	for (i = 0; i < sizeof(tty_list) / sizeof(tty_list[0]); i++) {
+		int pid = fork();
+		if (pid != 0) { /* parent process */
+			printf("[parent is running, child pid:%d]\n", pid);
+		}
+		else {	/* child process */
+			printf("[child is running, pid:%d]\n", getpid());
+			close(fd_stdin);
+			close(fd_stdout);
+			
+			shabby_shell(tty_list[i]);
+			assert(0);
+		}
+	}
+
+	while (1) {
+		int s;
+		int child = wait(&s);
+		printf("child (%d) exited with status: %d.\n", child, s);
+	}
+
+	assert(0);
+}
+#+END_SRC
+
+* Shell进程
+** Shell主循环
+1. 打开自己对应的TTY, 并将该TTY作为进程的stdin和stdout
+2. 由于父进程在执行shabby_shell之前已经关闭了所以文件,所以stdin和out分别对应fd0和1
+3. 进入shell主循环
+   1. 从stdin (TTY)读取用户输入
+      1. 以空格为分隔符解析字符串.
+      2. 字符串总数记为argc, 每个字符串的char * 指针存入argv并将argv[argc]置0以标记结尾
+   2. 尝试打开argv =[0]= 表示的可执行文件. 如果文件不存在,提示用户,继续主循环
+   3. 存在则调用fork
+      1. shell进程从fork返回后,调用wait等待子进程结束
+      2. 子进程则调用execv方法,执行可执行文件.
+#+BEGIN_SRC c
+void shabby_shell(const char * tty_name)
+{
+	int fd_stdin  = open(tty_name, O_RDWR);
+	assert(fd_stdin  == 0);
+	int fd_stdout = open(tty_name, O_RDWR);
+	assert(fd_stdout == 1);
+
+	char rdbuf[128];
+
+	while (1) {
+		write(1, "$ ", 2);
+		int r = read(0, rdbuf, 70);
+		rdbuf[r] = 0;
+
+		int argc = 0;
+		char * argv[PROC_ORIGIN_STACK];
+		char * p = rdbuf;
+		char * s;
+		int word = 0;
+		char ch;
+		do {
+			ch = *p;
+			if (*p != ' ' && *p != 0 && !word) {
+				s = p;
+				word = 1;
+			}
+			if ((*p == ' ' || *p == 0) && word) {
+				word = 0;
+				argv[argc++] = s;
+				*p = 0;
+			}
+			p++;
+		} while(ch);
+		argv[argc] = 0;
+
+		int fd = open(argv[0], O_RDWR);
+		if (fd == -1) {
+			if (rdbuf[0]) {
+				write(1, "{", 1);
+				write(1, rdbuf, r);
+				write(1, "}\n", 2);
+			}
+		}
+		else {
+			close(fd);
+			int pid = fork();
+			if (pid != 0) { /* parent */
+				int s;
+				wait(&s);
+			}
+			else {	/* child */
+				execv(argv[0], argv);
+			}
+		}
+	}
+
+	close(1);
+	close(0);
+}
+#+END_SRC
+
+** shell子进程
+1. 解析参数,计算argc并构造符合调用栈格式的argv
+   1. 由于shell进程没有把参数个数传递给execv,首先计算参数个数
+   2. argv前半部分是argc个字符串指针,接着以0和后半部分分割
+   3. argv后半部分是实际的字符串参数,参数之间以字符串结尾0分割
+2. 发消息给MM进程. 具体请参考MM.org 
+   1. MM进程会替换执行映像,建立调用栈,设置eip, esp等
+   2. 最后返回消息给shell子进程,解除其阻塞.
+   3. shell子进程获取到CPU后,就会开始执行可执行文件,最后调用exit和shell进程的wait配对.
+#+BEGIN_SRC c
+PUBLIC int execv(const char *path, char * argv[])
+{
+	char **p = argv;
+	char arg_stack[PROC_ORIGIN_STACK];
+	int stack_len = 0;
+
+	while(*p++) {
+		assert(stack_len + 2 * sizeof(char*) < PROC_ORIGIN_STACK);
+		stack_len += sizeof(char*);
+	}
+
+	*((int*)(&arg_stack[stack_len])) = 0;
+	stack_len += sizeof(char*);
+
+	char ** q = (char**)arg_stack;
+	for (p = argv; *p != 0; p++) {
+		*q++ = &arg_stack[stack_len];
+
+		assert(stack_len + strlen(*p) + 1 < PROC_ORIGIN_STACK);
+		strcpy(&arg_stack[stack_len], *p);
+		stack_len += strlen(*p);
+		arg_stack[stack_len] = 0;
+		stack_len++;
+	}
+
+	MESSAGE msg;
+	msg.type	= EXEC;
+	msg.PATHNAME	= (void*)path;
+	msg.NAME_LEN	= strlen(path);
+	msg.BUF		= (void*)arg_stack;
+	msg.BUF_LEN	= stack_len;
+
+	send_recv(BOTH, TASK_MM, &msg);
+	assert(msg.type == SYSCALL_RET);
+
+	return msg.RETVAL;
+}
+#+END_SRC
