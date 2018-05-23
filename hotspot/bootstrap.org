@@ -1,3 +1,8 @@
+* 问题
+1. safepoint polling ?
+2. difference between Mutex and Monitor ?
+3. 
+
 * 启动流程
 1. main函数位于jdk/src/share/bin/main.c
    1. 通过JLI_Launch调用解析命令行参数
@@ -6,14 +11,35 @@
    4. 然后主线程调用pthread_join等待JavaMain线程返回
 2. JavaMain: Java程序执行入口
    1. 调用InitializeJVM
+   2. vm_init_globals()
+   3. init_globals
+   4. 
 
 
 * 主要接口
-1. JavaMainArgs:
-   1. 封装了JavaMain执行所需参数, 包括argc, argv和几个主要的函数地址
-   2. JNI_CreateJavaVM/JNI_GetCreatedJavaVM等
-2. JNICALL: 是一个宏, 在linux下定义为空 (define JNICALL)
-3. JNIEnv
+1. JNICALL: 是一个宏, 在linux下定义为空 (define JNICALL)
+2. JavaMainArgs: 封装了命令行参数和关键的函数指针. 函数指针的值在dlopen libjvm.so时获得.
+   #+BEGIN_SRC c++
+   typedef struct {
+       int    argc;
+       char **argv;
+       int    mode;
+       char  *what;
+       InvocationFunctions ifn;
+   } JavaMainArgs;
+
+   typedef jint (JNICALL *CreateJavaVM_t)(JavaVM **pvm, void **env, void *args);
+   typedef jint (JNICALL *GetDefaultJavaVMInitArgs_t)(void *args);
+   typedef jint (JNICALL *GetCreatedJavaVMs_t)(JavaVM **vmBuf, jsize bufLen, jsize *nVMs);
+
+   typedef struct {
+       CreateJavaVM_t CreateJavaVM;
+       GetDefaultJavaVMInitArgs_t GetDefaultJavaVMInitArgs;
+       GetCreatedJavaVMs_t GetCreatedJavaVMs;
+   } InvocationFunctions;
+
+   #+END_SRC
+3. JNIEnv: Java JNI的关键接口
    #+BEGIN_SRC c++
    #ifdef __cplusplus
        typedef JNIEnv_ JNIEnv;
@@ -69,7 +95,7 @@
         #endif
     }
    #+END_SRC
-4. JavaVM
+4. JavaVM: 和JNIEnv类似, 在C和C++两种环境下有不同定义
    #+BEGIN_SRC c++
     #ifdef __cplusplus
         typedef JavaVM_ JavaVM;
@@ -116,4 +142,60 @@
         jint (JNICALL *AttachCurrentThreadAsDaemon)(JavaVM *vm, void **penv, void *args);
     };
    #+END_SRC
-5. 
+5. ThreadType
+   #+BEGIN_SRC c++
+   enum ThreadType {
+       vm_thread,
+       cgc_thread,        // Concurrent GC thread
+       pgc_thread,        // Parallel GC thread
+       java_thread,
+       compiler_thread,
+       watcher_thread,
+       os_thread
+   };
+   #+END_SRC
+6. MemoryType/MemoryFlag
+   #+BEGIN_SRC c++
+    enum MemoryType {
+      // Memory type by sub systems. It occupies lower byte.
+      mtJavaHeap          = 0x00,  // Java heap
+      mtClass             = 0x01,  // memory class for Java classes
+      mtThread            = 0x02,  // memory for thread objects
+      mtThreadStack       = 0x03,
+      mtCode              = 0x04,  // memory for generated code
+      mtGC                = 0x05,  // memory for GC
+      mtCompiler          = 0x06,  // memory for compiler
+      mtInternal          = 0x07,  // memory used by VM, but does not belong to
+                                     // any of above categories, and not used for
+                                     // native memory tracking
+      mtOther             = 0x08,  // memory not used by VM
+      mtSymbol            = 0x09,  // symbol
+      mtNMT               = 0x0A,  // memory used by native memory tracking
+      mtClassShared       = 0x0B,  // class data sharing
+      mtChunk             = 0x0C,  // chunk that holds content of arenas
+      mtTest              = 0x0D,  // Test type for verifying NMT
+      mtTracing           = 0x0E,  // memory used for Tracing
+      mtNone              = 0x0F,  // undefined
+      mt_number_of_types  = 0x10   // number of memory types (mtDontTrack
+                                     // is not included as validate type)
+    };
+   #+END_SRC
+7. JavaThreadState 
+   #+begin_example
+// keeps track of which part of the code a thread is executing in. This
+// information is needed by the safepoint code.
+//
+// There are 4 essential states:
+//
+//  _thread_new         : Just started, but not executed init. code yet (most likely still in OS init code)
+//  _thread_in_native   : In native code. This is a safepoint region, since all oops will be in jobject handles
+//  _thread_in_vm       : Executing in the vm
+//  _thread_in_Java     : Executing either interpreted or compiled Java code (or could be in a stub)
+//
+// Each state has an associated xxxx_trans state, which is an intermediate state used when a thread is in
+// a transition from one state to another. These extra states makes it possible for the safepoint code to
+// handle certain thread_states without having to suspend the thread - making the safepoint code faster.
+//
+// Given a state, the xxx_trans state can always be found by adding 1.
+   #+end_example
+8. 
