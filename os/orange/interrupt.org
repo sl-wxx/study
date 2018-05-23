@@ -63,7 +63,7 @@ restart:
 	lea	eax, [esp + P_STACKTOP]
 	mov	dword [tss + TSS3_S_SP0], eax
 restart_reenter:
-	dec	dword [k_reenter]
+	dec	dword [0k_reenter]
 	pop	gs
 	pop	fs
 	pop	es
@@ -78,7 +78,7 @@ restart_reenter:
 1. 初始化过程会将idt中的中断例程设置为 hwint_master/slave
 2. 中断发生时,
    1. CPU暂存用户进程的ss和esp
-   2. 从tss中读取ring0对应的ss0和esp0并切换到内核栈
+   2. 从tss中读取ring0对应的ss0和esp0并切换到内核栈(tss的段选择子位于task register)
    3. 将暂存的ss,esp和用户进程的eflags,cs,eip依次压栈
    4. 开始执行中断例程
 3. 由于tss中的esp0恰好指向PCB的栈帧末尾,2中的步骤恰好使得用户进程的ss,esp,eflags,cs,eip被保存到PCB中
