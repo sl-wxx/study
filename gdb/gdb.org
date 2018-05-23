@@ -1,0 +1,30 @@
+* 常用命令
+1. gdb program/gdb program core/gdb program running-PID
+2. break
+3. run
+4. step/next
+5. backtrace
+6. print
+7. list
+8. continue
+9. shell + comman-string
+10. info args/registers/breakpoints/macros
+11. file
+12. (un)set environment
+13. set cwd
+14. call
+15. start(i)
+16. set exec-wrapper env 'LD_DEBUG=libs'
+17. set args / show args
+18. attach / detach
+19. set follow-exec-mode new/same
+20. checkpoint/info checkpoint/restart checkpoint-id
+21. 
+** gdb 启动
+1. Auto-load: safe-path
+2. Logging:
+   1. set logging on/off
+   2. set logging file file-name
+   3. show logging
+3. Macro: 编译时需要 -gdwarf-3 -g3
+4. 
