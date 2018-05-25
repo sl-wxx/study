@@ -1,11 +1,16 @@
 * 启动流程
 1. main函数位于jdk/src/share/bin/main.c
-   1. 通过JLI_Launch调用解析命令行参数
+   1. 解析命令行参数
    2. 查找并动态加载libjvm.so
    3. 调用pthread库的pthread_create执行JavaMain
    4. 然后主线程调用pthread_join等待JavaMain线程返回
-2. JavaMain: Java程序执行入口
+2. JavaMain
    1. 调用InitializeJVM
+      1. 调用JNI_CreateJavaVM
+         1. 通过xchg指令和vm_created/safe_to_recreate_vm保证只有一个VM被创建
+         2. Threads::create_vm
+            1. check JNI version
+            2. 
 
 
 * 主要接口
