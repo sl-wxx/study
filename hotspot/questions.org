@@ -1,0 +1,13 @@
+| 问题描述                                                               | 代码位置                                             | 答案                                                          |
+|------------------------------------------------------------------------+------------------------------------------------------+---------------------------------------------------------------|
+| WatcherThread  "Can't malloc with crash protection from WatcherThread" | os::malloc                                           |                                                               |
+| safepoint polling                                                      | os::set_polling_page( polling_page );                |                                                               |
+| difference between Mutex and Monitor                                   |                                                      | Mutex extends Monitor and shadow Monitor's notify/wait method |
+| _sun_java_launcher_pid                                                 |                                                      | 为了兼容LinuxThreads和NPTL(Native POSIX Thread Library)       |
+| sysconf 不能跟进去调试                                                 | os::init                                             |                                                               |
+| what's shared space                                                    | Arguments::set_shared_spaces_flags()                 |                                                               |
+| TieredCompilation/NmethodSweepFraction                                 |                                                      |                                                               |
+| JDK8 Metaspace                                                         |                                                      |                                                               |
+| useMembar                                                              | os::set_memory_serialize_page( mem_serialize_page ); |                                                               |
+| GC/JavaThread/Java synchronization/memory areas/                       |                                                      |                                                               |
+|                                                                        |                                                      |                                                               |
