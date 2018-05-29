@@ -1,0 +1,67 @@
+** 主要接口
+#+BEGIN_SRC c++
+//
+// A class loader represents a linkset. Conceptually, a linkset identifies
+// the complete transitive closure of resolved links that a dynamic linker can
+// produce.
+//
+// A ClassLoaderData also encapsulates the allocation space, called a metaspace,
+// used by the dynamic linker to allocate the runtime representation of all
+// the types it defines.
+//
+// ClassLoaderData are stored in the runtime representation of classes and the
+// system dictionary, are roots of garbage collection, and provides iterators
+// for root tracing and other GC operations.
+
+class ClassLoaderData : public CHeapObj<mtClass> {
+ private:
+  static ClassLoaderData * _the_null_class_loader_data;
+
+  oop _class_loader;          // oop used to uniquely identify a class loader
+                              // class loader or a canonical class path
+  Dependencies _dependencies; // holds dependencies from this class loader
+                              // data to others.
+
+  Metaspace * _metaspace;  // Meta-space where meta-data defined by the
+                           // classes in the class loader are allocated.
+  Mutex* _metaspace_lock;  // Locks the metaspace for allocations and setup.
+  bool _unloading;         // true if this class loader goes away
+  bool _keep_alive;        // if this CLD is kept alive without a keep_alive_object().
+  bool _is_anonymous;      // if this CLD is for an anonymous class
+  volatile int _claimed;   // true if claimed, for example during GC traces.
+                           // To avoid applying oop closure more than once.
+                           // Has to be an int because we cas it.
+  Klass* _klasses;         // The classes defined by the class loader.
+
+  JNIHandleBlock* _handles; // Handles to constant pool arrays
+
+  // These method IDs are created for the class loader and set to NULL when the
+  // class loader is unloaded.  They are rarely freed, only for redefine classes
+  // and if they lose a data race in InstanceKlass.
+  JNIMethodBlock*                  _jmethod_ids;
+
+  // Metadata to be deallocated when it's safe at class unloading, when
+  // this class loader isn't unloaded itself.
+  GrowableArray<Metadata*>*      _deallocate_list;
+
+  // Support for walking class loader data objects
+  ClassLoaderData* _next; /// Next loader_datas created
+
+  // ReadOnly and ReadWrite metaspaces (static because only on the null
+  // class loader for now).
+  static Metaspace* _ro_metaspace;
+  static Metaspace* _rw_metaspace;
+}
+#+END_SRC
+
+** VMStruct
+#+BEGIN_SRC c++
+
+typedef struct VMStructEntry {
+  const char * typeName;           /* The type name containing the given field (example: "Klass") */
+  const char * fieldName;          /* The field name within the type           (example: "_name") */
+  uint64_t address;                /* Address of field; only used for static fields */
+                                   /* ("offset" can not be reused because of apparent SparcWorks compiler bug */
+                                   /* in generation of initializer data) */
+} VMStructEntry;
+#+END_SRC
