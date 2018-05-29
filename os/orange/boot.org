@@ -71,7 +71,7 @@
 5. lgdt [gdt_ptr]
 6. lidt [idt_ptr]
 7. 通过一个跳转指令使刚刚加载的gdt生效
-8. 加载之前初始化的tss
+8. 加载之前初始化的tss: ltr SELECTOR_TSS
 9. jmp kernel_main
 
 ** Main.c
