@@ -1,0 +1,50 @@
+#+BEGIN_SRC c++
+// This method should only be called from generated code,
+// therefore the exception oop should be in the oopmap.
+void Exceptions::_throw_oop(Thread* thread, const char* file, int line, oop exception) {
+  assert(exception != NULL, "exception should not be NULL");
+  Handle h_exception = Handle(thread, exception);
+  _throw(thread, file, line, h_exception);
+}
+
+void Exceptions::_throw(Thread* thread, const char* file, int line, Handle h_exception, const char* message) {
+  ResourceMark rm;
+  assert(h_exception() != NULL, "exception should not be NULL");
+
+  // tracing (do this up front - so it works during boot strapping)
+  if (TraceExceptions) {
+    ttyLocker ttyl;
+    tty->print_cr("Exception <%s%s%s> (" INTPTR_FORMAT ") \n"
+                  "thrown [%s, line %d]\nfor thread " INTPTR_FORMAT,
+                  h_exception->print_value_string(),
+                  message ? ": " : "", message ? message : "",
+                  (address)h_exception(), file, line, thread);
+  }
+  // for AbortVMOnException flag
+  NOT_PRODUCT(Exceptions::debug_check_abort(h_exception, message));
+
+  // Check for special boot-strapping/vm-thread handling
+  if (special_exception(thread, file, line, h_exception)) {
+    return;
+  }
+
+  assert(h_exception->is_a(SystemDictionary::Throwable_klass()), "exception is not a subclass of java/lang/Throwable");
+
+  // set the pending exception
+  thread->set_pending_exception(h_exception(), file, line);
+
+  // vm log
+  Events::log_exception(thread, "Exception <%s%s%s> (" INTPTR_FORMAT ") thrown at [%s, line %d]",
+                        h_exception->print_value_string(), message ? ": " : "", message ? message : "",
+                        (address)h_exception(), file, line);
+}
+
+Handle::Handle(Thread* thread, oop obj) {
+  assert(thread == Thread::current(), "sanity check");
+  if (obj == NULL) {
+    _handle = NULL;
+  } else {
+    _handle = thread->handle_area()->allocate_handle(obj);
+  }
+}
+#+END_SRC

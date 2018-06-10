@@ -10,4 +10,4 @@
 | JDK8 Metaspace                                                         |                                                      |                                                               |
 | useMembar                                                              | os::set_memory_serialize_page( mem_serialize_page ); |                                                               |
 | GC/JavaThread/Java synchronization/memory areas/                       |                                                      |                                                               |
-|                                                                        |                                                      |                                                               |
+| BarrierSet                                                             | class oopDesc                                        |                                                               |
