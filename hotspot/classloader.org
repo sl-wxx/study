@@ -1,24 +1,70 @@
-** 主要接口
-#+BEGIN_SRC c++
-//
-// A class loader represents a linkset. Conceptually, a linkset identifies
-// the complete transitive closure of resolved links that a dynamic linker can
-// produce.
-//
-// A ClassLoaderData also encapsulates the allocation space, called a metaspace,
-// used by the dynamic linker to allocate the runtime representation of all
-// the types it defines.
-//
-// ClassLoaderData are stored in the runtime representation of classes and the
-// system dictionary, are roots of garbage collection, and provides iterators
-// for root tracing and other GC operations.
+ClassLoaderData::init_null_class_loader_data();
+** 概述
+1. A class loader represents a linkset. Conceptually, a linkset identifies
+   the complete transitive closure of resolved links that a dynamic linker can
+   produce.
 
+2. A ClassLoaderData also encapsulates the allocation space, called a metaspace,
+   used by the dynamic linker to allocate the runtime representation of all
+   the types it defines.
+
+3. ClassLoaderData are stored in the runtime representation of classes and the
+   system dictionary, are roots of garbage collection, and provides iterators
+   for root tracing and other GC operations.
+
+** 关键代码
+1. ClassLoaderData::init_null_class_loader_data();
+   #+BEGIN_SRC c++
+static void init_null_class_loader_data() {
+  // We explicitly initialize the Dependencies object at a later phase in the initialization
+  _the_null_class_loader_data = new ClassLoaderData((oop)NULL, false, Dependencies());
+  ClassLoaderDataGraph::_head = _the_null_class_loader_data;
+}
+
+   #+END_SRC
+
+** 主要接口
+1. Handle
+   #+begin_example
+// In order to preserve oops during garbage collection, they should be
+// allocated and passed around via Handles within the VM. A handle is
+// simply an extra indirection allocated in a thread local handle area.
+//
+// A handle is a ValueObj, so it can be passed around as a value, can
+// be used as a parameter w/o using &-passing, and can be returned as a
+// return value.
+//
+// oop parameters and return types should be Handles whenever feasible.
+//
+// Handles are declared in a straight-forward manner, e.g.
+//
+//   oop obj = ...;
+//   Handle h1(obj);              // allocate new handle
+//   Handle h2(thread, obj);      // faster allocation when current thread is known
+//   Handle h3;                   // declare handle only, no allocation occurs
+//   ...
+//   h3 = h1;                     // make h3 refer to same indirection as h1
+//   oop obj2 = h2();             // get handle value
+//   h1->print();                 // invoking operation on oop
+//
+// Handles are specialized for different oop types to provide extra type
+// information and avoid unnecessary casting. For each oop type xxxOop
+// there is a corresponding handle called xxxHandle, e.g.
+//
+//   oop           Handle
+//   Method*       methodHandle
+//   instanceOop   instanceHandle
+   #+end_example
+
+2. ClassLoaderData
+   #+BEGIN_SRC c++
 class ClassLoaderData : public CHeapObj<mtClass> {
  private:
   static ClassLoaderData * _the_null_class_loader_data;
 
   oop _class_loader;          // oop used to uniquely identify a class loader
                               // class loader or a canonical class path
+                              // for bootstrap classloader, it's NULL
   Dependencies _dependencies; // holds dependencies from this class loader
                               // data to others.
 
@@ -52,7 +98,76 @@ class ClassLoaderData : public CHeapObj<mtClass> {
   static Metaspace* _ro_metaspace;
   static Metaspace* _rw_metaspace;
 }
-#+END_SRC
+   #+END_SRC
+
+3. ClassLoaderDataGraph
+   #+BEGIN_SRC c++
+class ClassLoaderDataGraph : public AllStatic {
+ private:
+  // All CLDs (except the null CLD) can be reached by walking _head->_next->...
+  static ClassLoaderData* _head;
+  static ClassLoaderData* _unloading;
+  // CMS support.
+  static ClassLoaderData* _saved_head;
+  static ClassLoaderData* _saved_unloading;
+  static bool _should_purge;
+
+  static ClassLoaderData* add(Handle class_loader, bool anonymous, TRAPS);
+  static void post_class_unload_events(void);
+  static void clean_metaspaces();
+ public:
+  static ClassLoaderData* find_or_create(Handle class_loader, TRAPS);
+  static void purge();
+  static void clear_claimed_marks();
+  // oops do
+  static void oops_do(OopClosure* f, KlassClosure* klass_closure, bool must_claim);
+  static void keep_alive_oops_do(OopClosure* blk, KlassClosure* klass_closure, bool must_claim);
+  static void always_strong_oops_do(OopClosure* blk, KlassClosure* klass_closure, bool must_claim);
+  // cld do
+  static void cld_do(CLDClosure* cl);
+  static void roots_cld_do(CLDClosure* strong, CLDClosure* weak);
+  static void keep_alive_cld_do(CLDClosure* cl);
+  static void always_strong_cld_do(CLDClosure* cl);
+  // klass do
+  static void classes_do(KlassClosure* klass_closure);
+  static void classes_do(void f(Klass* const));
+  static void loaded_classes_do(KlassClosure* klass_closure);
+  static void classes_unloading_do(void f(Klass* const));
+  static bool do_unloading(BoolObjectClosure* is_alive, bool clean_alive);
+
+  // CMS support.
+  static void remember_new_clds(bool remember) { _saved_head = (remember ? _head : NULL); }
+  static GrowableArray<ClassLoaderData*>* new_clds();
+
+  static void set_should_purge(bool b) { _should_purge = b; }
+  static void purge_if_needed() {
+    // Only purge the CLDG for CMS if concurrent sweep is complete.
+    if (_should_purge) {
+      purge();
+      // reset for next time.
+      set_should_purge(false);
+    }
+  }
+
+  static void free_deallocate_lists();
+
+  static void dump_on(outputStream * const out) PRODUCT_RETURN;
+  static void dump() { dump_on(tty); }
+  static void verify();
+
+  static bool unload_list_contains(const void* x);
+#ifndef PRODUCT
+  static bool contains_loader_data(ClassLoaderData* loader_data);
+#endif
+
+#if INCLUDE_TRACE
+ private:
+  static Ticks _class_unload_time;
+  static void class_unload_event(Klass* const k);
+#endif
+};
+
+   #+END_SRC
 
 ** VMStruct
 #+BEGIN_SRC c++
