@@ -25,8 +25,12 @@
             3. os::init_2()
                1. allocate safepoint polling page & memory barrier polling page
                2. 初始化相关信号量, 大部分信号量采用默认值, 额外添加了SR_initialize和shutdown hook
-               3. 计算线程栈大小, 栈底地址; 设置maxFD; 初始化话线程优先级相关配置
-            4. 
+               3. 计算线程栈大小, 栈底地址; 设置maxFD; 初始化线程优先级相关配置
+            4. init_globals()
+               1. universe_init()
+                  1. initialize_heap(): 根据gc策略初始化java heap
+                  2. Metaspace::global_initialize(): 分配metaspace空间并初始化
+                  3. ClassLoaderData::init_null_class_loader_data()
 
 * 源码分析
 1. Threads::create_vm
