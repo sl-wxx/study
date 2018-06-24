@@ -1,0 +1,55 @@
+#+BEGIN_SRC c++
+class ConstMethod : public MetaspaceObj {
+
+public:
+  typedef enum { NORMAL, OVERPASS } MethodType;
+
+private:
+  enum {
+    _has_linenumber_table = 0x0001,
+    _has_checked_exceptions = 0x0002,
+    _has_localvariable_table = 0x0004,
+    _has_exception_table = 0x0008,
+    _has_generic_signature = 0x0010,
+    _has_method_parameters = 0x0020,
+    _is_overpass = 0x0040,
+    _has_method_annotations = 0x0080,
+    _has_parameter_annotations = 0x0100,
+    _has_type_annotations = 0x0200,
+    _has_default_annotations = 0x0400
+  };
+
+  // Bit vector of signature
+  // Callers interpret 0=not initialized yet and
+  // -1=too many args to fix, must parse the slow way.
+  // The real initial value is special to account for nonatomicity of 64 bit
+  // loads and stores.  This value may updated and read without a lock by
+  // multiple threads, so is volatile.
+  volatile uint64_t _fingerprint;
+
+  ConstantPool*     _constants;                  // Constant pool
+
+  // Raw stackmap data for the method
+  Array<u1>*        _stackmap_data;
+
+  int               _constMethod_size;
+  u2                _flags;
+
+  // Size of Java bytecodes allocated immediately after Method*.
+  u2                _code_size;
+  u2                _name_index;                 // Method name (index in constant pool)
+  u2                _signature_index;            // Method signature (index in constant pool)
+  u2                _method_idnum;               // unique identification number for the method within the class
+                                                 // initially corresponds to the index into the methods array.
+                                                 // but this may change with redefinition
+  u2                _max_stack;                  // Maximum number of entries on the expression stack
+  u2                _max_locals;                 // Number of local variables used by this method
+  u2                _size_of_parameters;         // size of the parameter block (receiver + arguments) in words
+  u2                _orig_method_idnum;          // Original unique identification number for the method
+
+
+  // Unique id for the method
+  static const u2 MAX_IDNUM;
+  static const u2 UNSET_IDNUM;
+};
+#+END_SRC

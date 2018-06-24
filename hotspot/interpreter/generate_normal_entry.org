@@ -1,0 +1,324 @@
+* 调用层级
+   #+begin_example
+0  in InterpreterGenerator::generate_normal_entry of hotspot/src/cpu/x86/vm/templateInterpreter_x86_64.cpp:1403
+1  in AbstractInterpreterGenerator::generate_method_entry of hotspot/src/cpu/x86/vm/templateInterpreter_x86_64.cpp:1660
+2  in TemplateInterpreterGenerator::generate_all of hotspot/src/share/vm/interpreter/templateInterpreter.cpp:369
+3  in InterpreterGenerator::InterpreterGenerator of hotspot/src/cpu/x86/vm/templateInterpreter_x86_64.cpp:1970
+4  in TemplateInterpreter::initialize of hotspot/src/share/vm/interpreter/templateInterpreter.cpp:52
+5  in interpreter_init of hotspot/src/share/vm/interpreter/interpreter.cpp:118
+6  in init_globals of hotspot/src/share/vm/runtime/init.cpp:109
+7  in Threads::create_vm of hotspot/src/share/vm/runtime/thread.cpp:3418
+   #+end_example
+
+* 起始状态
+  | 栈             | 说明 | 寄存器          | 说明                    |
+  |----------------+------+-----------------+-------------------------|
+  | return address |      | rbx=Method*     | Method* 表示Java method |
+  | param1         |      | r13 = sender sp |                         |
+  | param2         |      |                 |                         |
+  | ......         |      |                 |                         |
+
+* 最终状态
+  | 栈                | 说明                                                | 寄存器 | 说明 |
+  |-------------------+-----------------------------------------------------+--------+------|
+  | Monitor 相关      | 只对synchronize方法才有这部分                       |        |      |
+  | 0                 | reserve word for pointer to expression stack bottom |        |      |
+  | r13               | bcp: bytecode pointer. 0 for native frame           |        |      |
+  | r14               | pointer to locals                                   |        |      |
+  | cpCache           | Method*.constMethod.constantPool._cache             |        |      |
+  | mdp               | Method*.methodData.data_offset                      |        |      |
+  | rbx               | Method*                                             |        |      |
+  | NULL_WORD         | last_sp                                             |        |      |
+  | r13               | sender sp                                           |        |      |
+  | old rbp           |                                                     |        |      |
+  | return pc         |                                                     |        |      |
+  | locals and params |                                                     |        |      |
+
+* 代码说明
+  1. 起始状态: rbx=Method*, r13=sender sp, 栈的结构如上表.
+  2. locals包含函数局部变量和形参.形参在开始时已经位于栈上, 并紧邻return address.
+     这里先将return address pop到rax, 然后在栈上为局部变量分配空间并初始化为0.
+     最终的结果是局部变量和形参都位于栈上并相邻. 同时令r14=locals. 
+  3. generate_fixed_frame(false) 
+     建立了主要的栈结构.
+  4. if(synchronized) { lock_method(); } 
+     参见synchronize.org
+  5. dispatch_next(vtos)
+
+* 源代码
+  这里省略了profile/verify/assert相关代码, 只保留了重要的逻辑部分.
+  #+BEGIN_SRC c++
+//
+// Generic interpreted method entry to (asm) interpreter
+//
+address InterpreterGenerator::generate_normal_entry(bool synchronized) {
+
+  // ebx: Method*
+  // r13: sender sp
+  address entry_point = __ pc();
+
+  const Address constMethod(rbx, Method::const_offset());
+  const Address access_flags(rbx, Method::access_flags_offset());
+  const Address size_of_parameters(rdx,
+                                   ConstMethod::size_of_parameters_offset());
+  const Address size_of_locals(rdx, ConstMethod::size_of_locals_offset());
+
+
+  // get parameter size (always needed)
+  __ movptr(rdx, constMethod);
+  __ load_unsigned_short(rcx, size_of_parameters);
+
+  // rbx: Method*
+  // rcx: size of parameters
+  // r13: sender_sp (could differ from sp+wordSize if we were called via c2i )
+
+  __ load_unsigned_short(rdx, size_of_locals); // get size of locals in words
+  __ subl(rdx, rcx); // rdx = no. of additional locals
+
+  // YYY
+//   __ incrementl(rdx);
+//   __ andl(rdx, -2);
+
+  // see if we've got enough room on the stack for locals plus overhead.
+  generate_stack_overflow_check();
+
+  // get return address
+  __ pop(rax);
+
+  // compute beginning of parameters (r14)
+  __ lea(r14, Address(rsp, rcx, Address::times_8, -wordSize));
+
+  // rdx - # of additional locals
+  // allocate space for locals
+  // explicitly initialize locals
+  {
+    Label exit, loop;
+    __ testl(rdx, rdx);
+    __ jcc(Assembler::lessEqual, exit); // do nothing if rdx <= 0
+    __ bind(loop);
+    __ push((int) NULL_WORD); // initialize local variables
+    __ decrementl(rdx); // until everything initialized
+    __ jcc(Assembler::greater, loop);
+    __ bind(exit);
+  }
+
+  // initialize fixed part of activation frame
+  generate_fixed_frame(false);
+
+  // check for synchronized methods
+  // Must happen AFTER invocation_counter check and stack overflow check,
+  // so method is not locked if overflows.
+  if (synchronized) {
+    // Allocate monitor and lock method
+    lock_method();
+  } else {
+    // no synchronization necessary
+  }
+
+  // jvmti support
+  __ notify_method_entry();
+
+  __ dispatch_next(vtos);
+
+  return entry_point;
+}
+
+// Generate a fixed interpreter frame. This is identical setup for
+// interpreted methods and for native methods hence the shared code.
+//
+// Args:
+//      rax: return address
+//      rbx: Method*
+//      r14: pointer to locals
+//      r13: sender sp
+//      rdx: cp cache
+void TemplateInterpreterGenerator::generate_fixed_frame(bool native_call) {
+  // initialize fixed part of activation frame
+  __ push(rax);        // save return address
+  __ enter();          // save old & set new rbp
+  __ push(r13);        // set sender sp
+  __ push((int)NULL_WORD); // leave last_sp as null
+  __ movptr(r13, Address(rbx, Method::const_offset()));      // get ConstMethod*
+  __ lea(r13, Address(r13, ConstMethod::codes_offset())); // get codebase
+  __ push(rbx);        // save Method*
+  if (ProfileInterpreter) {
+    Label method_data_continue;
+    __ movptr(rdx, Address(rbx, in_bytes(Method::method_data_offset())));
+    __ testptr(rdx, rdx);
+    __ jcc(Assembler::zero, method_data_continue);
+    __ addptr(rdx, in_bytes(MethodData::data_offset()));
+    __ bind(method_data_continue);
+    __ push(rdx);      // set the mdp (method data pointer)
+  } else {
+    __ push(0);
+  }
+
+  __ movptr(rdx, Address(rbx, Method::const_offset()));
+  __ movptr(rdx, Address(rdx, ConstMethod::constants_offset()));
+  __ movptr(rdx, Address(rdx, ConstantPool::cache_offset_in_bytes()));
+  __ push(rdx); // set constant pool cache
+  __ push(r14); // set locals pointer
+  if (native_call) {
+    __ push(0); // no bcp
+  } else {
+    __ push(r13); // set bcp
+  }
+  __ push(0); // reserve word for pointer to expression stack bottom
+  __ movptr(Address(rsp, 0), rsp); // set expression stack bottom
+}
+
+void InterpreterMacroAssembler::dispatch_next(TosState state, int step) {
+  // load next bytecode (load before advancing r13 to prevent AGI)
+  load_unsigned_byte(rbx, Address(r13, step));
+  // advance r13
+  increment(r13, step);
+  dispatch_base(state, Interpreter::dispatch_table(state));
+}
+
+static address* dispatch_table(TosState state) { 
+  return _active_table.table_for(state); 
+}
+
+void InterpreterMacroAssembler::dispatch_base(TosState state,
+                                              address* table,
+                                              bool verifyoop) {
+  lea(rscratch1, ExternalAddress((address)table));
+  jmp(Address(rscratch1, rbx, Address::times_8));
+}
+
+
+  #+END_SRC
+
+  #+BEGIN_SRC c++
+class DispatchTable VALUE_OBJ_CLASS_SPEC {
+ public:
+  enum { length = 1 << BitsPerByte };                 // an entry point for each byte value (also for undefined bytecodes)
+
+ private:
+  address _table[number_of_states][length];           // dispatch tables, indexed by tosca and bytecode
+
+ public:
+  // Attributes
+  EntryPoint entry(int i) const;                      // return entry point for a given bytecode i
+  void       set_entry(int i, EntryPoint& entry);     // set    entry point for a given bytecode i
+  address*   table_for(TosState state)          { return _table[state]; }
+  address*   table_for()                        { return table_for((TosState)0); }
+  int        distance_from(address *table)      { return table - table_for(); }
+  int        distance_from(TosState state)      { return distance_from(table_for(state)); }
+
+  // Comparison
+  bool operator == (DispatchTable& y);                // for debugging only
+};  
+  #+END_SRC
+
+  #+BEGIN_SRC c++
+void TemplateInterpreterGenerator::set_entry_points(Bytecodes::Code code) {
+  CodeletMark cm(_masm, Bytecodes::name(code), code);
+  // initialize entry points
+  assert(_unimplemented_bytecode    != NULL, "should have been generated before");
+  assert(_illegal_bytecode_sequence != NULL, "should have been generated before");
+  address bep = _illegal_bytecode_sequence;
+  address cep = _illegal_bytecode_sequence;
+  address sep = _illegal_bytecode_sequence;
+  address aep = _illegal_bytecode_sequence;
+  address iep = _illegal_bytecode_sequence;
+  address lep = _illegal_bytecode_sequence;
+  address fep = _illegal_bytecode_sequence;
+  address dep = _illegal_bytecode_sequence;
+  address vep = _unimplemented_bytecode;
+  address wep = _unimplemented_bytecode;
+  // code for short & wide version of bytecode
+  if (Bytecodes::is_defined(code)) {
+    Template* t = TemplateTable::template_for(code);
+    assert(t->is_valid(), "just checking");
+    set_short_entry_points(t, bep, cep, sep, aep, iep, lep, fep, dep, vep);
+  }
+  if (Bytecodes::wide_is_defined(code)) {
+    Template* t = TemplateTable::template_for_wide(code);
+    assert(t->is_valid(), "just checking");
+    set_wide_entry_point(t, wep);
+  }
+  // set entry points
+  EntryPoint entry(bep, cep, sep, aep, iep, lep, fep, dep, vep);
+  Interpreter::_normal_table.set_entry(code, entry);
+  Interpreter::_wentry_point[code] = wep;
+}  
+
+void TemplateInterpreterGenerator::set_short_entry_points(Template* t, address& bep, address& cep, address& sep, address& aep, address& iep, address& lep, address& fep, address& dep, address& vep) {
+  assert(t->is_valid(), "template must exist");
+  switch (t->tos_in()) {
+    case btos:
+    case ctos:
+    case stos:
+      ShouldNotReachHere();  // btos/ctos/stos should use itos.
+      break;
+    case atos: vep = __ pc(); __ pop(atos); aep = __ pc(); generate_and_dispatch(t); break;
+    case itos: vep = __ pc(); __ pop(itos); iep = __ pc(); generate_and_dispatch(t); break;
+    case ltos: vep = __ pc(); __ pop(ltos); lep = __ pc(); generate_and_dispatch(t); break;
+    case ftos: vep = __ pc(); __ pop(ftos); fep = __ pc(); generate_and_dispatch(t); break;
+    case dtos: vep = __ pc(); __ pop(dtos); dep = __ pc(); generate_and_dispatch(t); break;
+    case vtos: set_vtos_entry_points(t, bep, cep, sep, aep, iep, lep, fep, dep, vep);     break;
+    default  : ShouldNotReachHere();                                                 break;
+  }
+}
+
+void TemplateInterpreterGenerator::generate_and_dispatch(Template* t, TosState tos_out) {
+  if (PrintBytecodeHistogram)                                    histogram_bytecode(t);
+  int step;
+  if (!t->does_dispatch()) {
+    step = t->is_wide() ? Bytecodes::wide_length_for(t->bytecode()) : Bytecodes::length_for(t->bytecode());
+    if (tos_out == ilgl) tos_out = t->tos_out();
+    // compute bytecode size
+    assert(step > 0, "just checkin'");
+    // setup stuff for dispatching next bytecode
+    if (ProfileInterpreter && VerifyDataPointer
+        && MethodData::bytecode_has_profile(t->bytecode())) {
+      __ verify_method_data_pointer();
+    }
+    __ dispatch_prolog(tos_out, step);
+  }
+  // generate template
+  t->generate(_masm);
+  // advance
+  if (t->does_dispatch()) {
+
+  } else {
+    // dispatch to next bytecode
+    __ dispatch_epilog(tos_out, step);
+  }
+}
+
+// The following two routines provide a hook so that an implementation
+// can schedule the dispatch in two parts.  amd64 does not do this.
+void InterpreterMacroAssembler::dispatch_prolog(TosState state, int step) {
+  // Nothing amd64 specific to be done here
+}
+
+void InterpreterMacroAssembler::dispatch_epilog(TosState state, int step) {
+  dispatch_next(state, step);
+}
+
+void TemplateInterpreterGenerator::set_vtos_entry_points(Template* t,
+                                                         address& bep,
+                                                         address& cep,
+                                                         address& sep,
+                                                         address& aep,
+                                                         address& iep,
+                                                         address& lep,
+                                                         address& fep,
+                                                         address& dep,
+                                                         address& vep) {
+  assert(t->is_valid() && t->tos_in() == vtos, "illegal template");
+  Label L;
+  aep = __ pc();  __ push_ptr();  __ jmp(L);
+  fep = __ pc();  __ push_f();    __ jmp(L);
+  dep = __ pc();  __ push_d();    __ jmp(L);
+  lep = __ pc();  __ push_l();    __ jmp(L);
+  bep = cep = sep =
+  iep = __ pc();  __ push_i();
+  vep = __ pc();
+  __ bind(L);
+  generate_and_dispatch(t);
+}
+
+  #+END_SRC

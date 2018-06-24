@@ -1,0 +1,21 @@
+#+begin_example
+     |-------------------------------------------------------|
+     | c_rarg0   c_rarg1  c_rarg2 c_rarg3 c_rarg4 c_rarg5    |
+     |-------------------------------------------------------|
+     | rcx       rdx      r8      r9      rdi*    rsi*       | windows (* not a c_rarg)
+     | rdi       rsi      rdx     rcx     r8      r9         | solaris/linux
+     |-------------------------------------------------------|
+     | j_rarg5   j_rarg0  j_rarg1 j_rarg2 j_rarg3 j_rarg4    |
+     |-------------------------------------------------------|
+#+end_example
+
+* System V AMD64 ABI
+The calling convention of the System V AMD64 ABI is followed on Solaris, Linux, FreeBSD, macOS and is the de facto standard among Unix and Unix-like operating systems. The first six integer or pointer arguments are passed in registers RDI, RSI, RDX, RCX, R8, R9 (R10 is used as a static chain pointer in case of nested functions), while XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6 and XMM7 are used for certain floating point arguments. As in the Microsoft x64 calling convention, additional arguments are passed on the stack. Integral return values up to 64 bits in size are stored in RAX while values up to 128 bit are stored in RAX and RDX. Floating-point return values are similarly stored in XMM0 and XMM1.
+
+If the callee wishes to use registers RBX, RBP, and R12–R15, it must restore their original values before returning control to the caller. All other registers must be saved by the caller if it wishes to preserve their values.
+
+For leaf-node functions (functions which do not call any other function(s)), a 128-bytes space is stored just beneath the stack pointer of the function. The space is called red-zone. This zone will not be clobbered by any signal or interrupt handlers. Compilers can thus utilize this zone to save local variables. Compilers may omit some instructions at the starting of the function (adjustment of %rsp, %rbp) by utilizing this zone. However, other function may clobber this zone. Therefore, this zone should only be used for leaf-node functions. gcc and clang takes -mno-red-zone flag to disable red-zone optimizations.
+
+If the callee is a variadic function, then the number of floating point arguments passed to the function in vector registers must be provided by the caller in the RAX register.
+
+Unlike the Microsoft calling convention, a shadow space is not provided; on function entry, the return address is adjacent to the seventh integer argument on the stack.
