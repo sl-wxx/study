@@ -1,7 +1,0 @@
-* 概述
-
-* 源码
-
-#+BEGIN_SRC c++
-
-#+END_SRC
