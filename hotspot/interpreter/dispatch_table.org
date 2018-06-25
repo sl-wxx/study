@@ -15,16 +15,59 @@
       这是因为接下来的字节码可能会用到rax, 如果不先把rax保存到栈上, 就会丢失ref值了.
    #+end_example
 4. 需要push则tos_out != vtos, 如aload; 需要pop则tos_in != vtos, 如iaload.
-   | 前一条字节码 | 后一条字节码 | 操作 |
-   |--------------+--------------+------|
-   | 需要push     | 需要pop      | 无   |
-   | 需要push     | 不需要pop    | push |
-   | 不需要push   | 需要pop      | pop  |
-   | 不需要push   | 不需要pop    | 无   |
+   | 序号 | 前一条字节码 | 后一条字节码 | 操作 |
+   |------+--------------+--------------+------|
+   |    1 | 需要push     | 需要pop      | 无   |
+   |    2 | 需要push     | 不需要pop    | push |
+   |    3 | 不需要push   | 需要pop      | pop  |
+   |    4 | 不需要push   | 不需要pop    | 无   |
 5. address _table[number_of_states][length];
    1. length=255 对应字节码总数小于等于255.
    2. number_of_states 对应参数可能的状态 7种类型+vtos(表示没有)
+* 实例分析
+#+BEGIN_SRC java
+public static void main(String[] args) {
+    int array[] = new int[2];
+    int x = array[1];
+}
 
+// javap -c Main.class
+public static void main(java.lang.String[]);
+    Code:
+       0: iconst_2
+       1: newarray       int
+       3: astore_1
+       4: aload_1
+       5: iconst_1
+       6: iaload
+       7: istore_2
+       8: return
+#+END_SRC
+
+如上, 我们只分析Code的3~6部分.
+1. aload_1 -> iconst_1 符合表中第2条
+2. iconst_1 -> iaload 符号表中第1条
+
+#+BEGIN_SRC asm
+aload_1:
+    mov rax, ref_       // 这里简单的用ref_指代array
+
+iconst_1:
+    mov rax, 0x1
+
+iaload:                 // iaload需要消费两个参数, rdx由栈上获取, rax是直接使用.
+    pop rdx             // 注意这里的pop不是操作数栈维护指令, 而是iaload本身的功能指令.
+    mov rax, rdx + rax * 4 + arrayOopDesc::base_offset_in_bytes(T_INT)
+
+
+// 最终结果
+array[1]:
+    mov rax, ref_
+    push rax            // 这里的push指令是操作数栈维护指令.
+    mov rax, 0x1
+    pop rdx
+    mov rax, rdx + rax * 4 + arrayOopDesc::base_offset_in_bytes(T_INT)
+#+END_SRC
 * 源码
 ** 数据结构定义
 #+BEGIN_SRC c++
