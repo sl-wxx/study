@@ -2,7 +2,7 @@
 1. DispatchTable记录了每个字节码对应的机器码.
 2. 对于非跳转字节码, 机器码还包含跳转到下一字节码执行的指令.
    即: 如果当前字节码本身不包含跳转指令, 则跳转到下一条字节码执行.
-   这样就完成了对"执行当前指令, eip++"的模拟.
+   这样就完成了对"执行当前指令, eip = eip + length(current bytecode)"的模拟.
 3. 由于字节码经常需要维护操作数栈, dispatchTable对这一块做了统一处理.
    也就是把维护操作数栈的指令和字节码本身的功能指令进行解耦.
    为了提高效率, 操作数栈会尽可能的通过通用寄存器来模拟, 而避免直接的栈操作.
@@ -183,7 +183,6 @@ void TemplateInterpreterGenerator::generate_and_dispatch(Template* t, TosState t
   t->generate(_masm);
   // advance
   if (t->does_dispatch()) {
-qq
 
   } else {
     // dispatch to next bytecode
