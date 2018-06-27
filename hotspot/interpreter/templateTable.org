@@ -1,0 +1,118 @@
+1. TemplateTable结构
+   TemplateTable的主要成员是Template类型的数组_template_table/_template_table_wide. 
+   Template保存了字节码相关的属性和一个函数指针generator.该函数用于生成字节码对应的汇编指令.
+   #+BEGIN_SRC c++
+class TemplateTable: AllStatic {
+ public:
+  enum Operation { add, sub, mul, div, rem, _and, _or, _xor, shl, shr, ushr };
+  enum Condition { equal, not_equal, less, less_equal, greater, greater_equal };
+  enum CacheByte { f1_byte = 1, f2_byte = 2 };  // byte_no codes
+
+ private:
+  static bool            _is_initialized;        // true if TemplateTable has been initialized
+  static Template        _template_table     [Bytecodes::number_of_codes];
+  static Template        _template_table_wide[Bytecodes::number_of_codes];
+
+  static Template*       _desc;                  // the current template to be generated
+ 
+  static BarrierSet*     _bs;                    // Cache the barrier set.
+ public:
+  //%note templates_1
+  static InterpreterMacroAssembler* _masm;       // the assembler used when generating templates 
+}   
+   #+END_SRC
+2. 初始化TemplateTable::_template_table/_template_table_wide
+   def函数负责初始化_template_table数组的元素. 代码如下:
+   #+BEGIN_SRC c++
+void TemplateTable::initialize() {
+
+  const char _    = ' ';
+  const int  ____ = 0;
+
+  //                         interpr. templates
+  // Java spec bytecodes     ubcp|disp|clvm|iswd  in    out   generator    argument
+  def(Bytecodes::_iconst_0,  ____|____|____|____, vtos, itos, iconst,      0           );
+  def(Bytecodes::_iconst_1,  ____|____|____|____, vtos, itos, iconst,      1           );
+  def(Bytecodes::_istore_0,  ____|____|____|____, itos, vtos, istore,      0           );
+  def(Bytecodes::_istore_1,  ____|____|____|____, itos, vtos, istore,      1           );
+  //..............
+  //..............
+}
+
+// 上面的in和out都是TosState类型
+// TosState describes the top-of-stack state before and after the execution of
+// a bytecode or method. The top-of-stack value may be cached in one or more CPU
+// registers. The TosState corresponds to the 'machine represention' of this cached
+// value. There's 4 states corresponding to the JAVA types int, long, float & double
+// as well as a 5th state in case the top-of-stack value is actually on the top
+// of stack (in memory) and thus not cached. The atos state corresponds to the itos
+// state when it comes to machine representation but is used separately for (oop)
+// type specific operations (e.g. verification code).
+
+enum TosState {         // describes the tos cache contents
+  btos = 0,             // byte, bool tos cached
+  ctos = 1,             // char tos cached
+  stos = 2,             // short tos cached
+  itos = 3,             // int tos cached
+  ltos = 4,             // long tos cached
+  ftos = 5,             // float tos cached
+  dtos = 6,             // double tos cached
+  atos = 7,             // object cached
+  vtos = 8,             // tos not cached
+  number_of_states,
+  ilgl                  // illegal state: should not occur
+};
+
+typedef void (*generator)(int arg);
+   #+END_SRC
+3. 根据字节码生成汇编代码
+   这里以iconst和istore为例分析.
+   1. iconst_<i>
+      1. 通过查阅JVMS可知iconst_<i>的含义为: 将数值i push到操作数栈.
+      2. 根据源码易知其对应的汇编指令为: movl rax, i
+      3. 其in=vtos表示不需要操作数栈提供参数, 其out=itos表示字节码执行结束后操作数栈顶是一个int值
+      4. 操作数栈维护和字节码本身的逻辑是分开的, 具体参见dispatch_table.org
+         #+BEGIN_SRC c++
+#define __ _masm->   
+
+void TemplateTable::iconst(int value) {
+  transition(vtos, itos);
+  if (value == 0) {
+   __ xorl(rax, rax);
+  } else {
+   __ movl(rax, value);
+  }
+}
+
+// 对应汇编代码 movl rax, imm32. 查阅intel开发手册可知, B8在机器码中表示mov
+void Assembler::movl(Register dst, int32_t imm32) {
+  int encode = prefix_and_encode(dst->encoding());
+  emit_int8((unsigned char)(0xB8 | encode));
+  emit_int32(imm32);
+}         
+         #+END_SRC
+   2. istore_<i>
+      1. istore_<i>的作用是将操作数栈顶的int值赋值给locals =[i]=
+      2. 其in=itos表示需要操作数栈提供int型参数, out=vtos表示执行后没有向操作数栈push数据.
+      3. 其对应的汇编代码类似: movl locals =[i]= , rax
+      #+BEGIN_SRC c++
+#define __ _masm->   
+
+void TemplateTable::istore(int n) {
+  transition(itos, vtos);
+  __ movl(iaddress(n), rax);
+}      
+
+// r14: pointer to locals
+static inline Address iaddress(int n) {
+  return Address(r14, Interpreter::local_offset_in_bytes(n));
+}
+
+// Local values relative to locals[n]
+static int  local_offset_in_bytes(int n) {
+  return ((frame::interpreter_frame_expression_stack_direction() * n) * stackElementSize);
+}
+
+inline jint frame::interpreter_frame_expression_stack_direction() { return -1; }
+
+      #+END_SRC

@@ -1,0 +1,14 @@
+* 传统x86函数调用栈结构
+
+被调用函数执行时:
+| 栈          | 说明                   |
+| arg1        |                        |
+| arg2        |                        |
+| ret address | call指令将返回地址压栈 |
+| rbp (old)   | push rbp               |
+| rbp指向此处 | mov  rbp, rsp          |
+| xxx         |                        |
+| yyy         |                        |
+| zzz         |                        |
+
+函数返回时:
