@@ -1,0 +1,39 @@
+#+BEGIN_SRC c++
+static EntryPoint _safept_entry;
+
+Interpreter::_safept_entry =
+      EntryPoint(
+        generate_safept_entry_for(btos, CAST_FROM_FN_PTR(address, InterpreterRuntime::at_safepoint)),
+        generate_safept_entry_for(ctos, CAST_FROM_FN_PTR(address, InterpreterRuntime::at_safepoint)),
+        generate_safept_entry_for(stos, CAST_FROM_FN_PTR(address, InterpreterRuntime::at_safepoint)),
+        generate_safept_entry_for(atos, CAST_FROM_FN_PTR(address, InterpreterRuntime::at_safepoint)),
+        generate_safept_entry_for(itos, CAST_FROM_FN_PTR(address, InterpreterRuntime::at_safepoint)),
+        generate_safept_entry_for(ltos, CAST_FROM_FN_PTR(address, InterpreterRuntime::at_safepoint)),
+        generate_safept_entry_for(ftos, CAST_FROM_FN_PTR(address, InterpreterRuntime::at_safepoint)),
+        generate_safept_entry_for(dtos, CAST_FROM_FN_PTR(address, InterpreterRuntime::at_safepoint)),
+        generate_safept_entry_for(vtos, CAST_FROM_FN_PTR(address, InterpreterRuntime::at_safepoint))
+      );
+
+address TemplateInterpreterGenerator::generate_safept_entry_for(
+        TosState state,
+        address runtime_entry) {
+  address entry = __ pc();
+  __ push(state);
+  __ call_VM(noreg, runtime_entry);
+  __ dispatch_via(vtos, Interpreter::_normal_table.table_for(vtos));
+  return entry;
+}
+
+
+// the safepoint dispatch table (used to set the active table for safepoints)
+static DispatchTable _safept_table; 
+
+void TemplateInterpreterGenerator::set_safepoints_for_all_bytes() {
+  for (int i = 0; i < DispatchTable::length; i++) {
+    Bytecodes::Code code = (Bytecodes::Code)i;
+    if (Bytecodes::is_defined(code)) {
+      Interpreter::_safept_table.set_entry(code, Interpreter::_safept_entry);
+    }
+  }
+}
+#+END_SRC

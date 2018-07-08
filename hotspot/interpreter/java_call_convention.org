@@ -19,3 +19,89 @@ For leaf-node functions (functions which do not call any other function(s)), a 1
 If the callee is a variadic function, then the number of floating point arguments passed to the function in vector registers must be provided by the caller in the RAX register.
 
 Unlike the Microsoft calling convention, a shadow space is not provided; on function entry, the return address is adjacent to the seventh integer argument on the stack.
+
+* 概述
+  JVM中的函数有interpreted和compiled两种情况, 对应的调用情况分4种: i2i/i2c/c2i/c2c
+  #+BEGIN_SRC c++
+class Method : public Metadata {
+
+  // Entry point for calling both from and to the interpreter.
+  address _i2i_entry;           // All-args-on-stack calling convention
+
+  // Entry point for calling from compiled code, to compiled code if it exists
+  // or else the interpreter.
+  volatile address _from_compiled_entry; // _code ? _code->entry_point() : _adapter->c2i_entry()
+  volatile address  _from_interpreted_entry; // Cache of _code ? _adapter->i2c_entry() : _i2i_entry
+
+  // The entry point for calling both from and to compiled code is
+  // "_code->entry_point()".  Because of tiered compilation and de-opt, this
+  // field can come and go.  It can transition from NULL to not-null at any
+  // time (whenever a compile completes).  It can transition from not-null to
+  // NULL only at safepoints (because of a de-opt).
+  nmethod* volatile _code;                       // Points to the corresponding piece of native code
+
+  // Adapter blob (i2c/c2i) for this Method*. Set once when method is linked.
+  AdapterHandlerEntry* _adapter;
+}
+
+// Native wrappers, like adapters, marshal arguments.  Unlike adapters they
+// also perform an offical frame push & pop.  They have a call to the native
+// routine in their middles and end in a return (instead of ending in a jump).
+// The native wrappers are stored in real nmethods instead of the BufferBlobs
+// used by the adapters.  The code generation happens here because it's very
+// similar to what the adapters have to do.
+
+class AdapterHandlerEntry : public BasicHashtableEntry<mtCode> {
+  friend class AdapterHandlerTable;
+
+ private:
+  AdapterFingerPrint* _fingerprint;
+  address _i2c_entry;
+  address _c2i_entry;
+  address _c2i_unverified_entry;
+}  
+  #+END_SRC
+
+
+#+BEGIN_SRC c++
+JVM_ENTRY(void, JVM_RegisterMethodHandleMethods(JNIEnv *env, jclass MHN_class)) {
+  if (!EnableInvokeDynamic) {
+    warning("JSR 292 is disabled in this JVM.  Use -XX:+UnlockDiagnosticVMOptions -XX:+EnableInvokeDynamic to enable.");
+    return;  // bind nothing
+  }
+
+  assert(!MethodHandles::enabled(), "must not be enabled");
+  bool enable_MH = true;
+
+  jclass MH_class = NULL;
+  if (SystemDictionary::MethodHandle_klass() == NULL) {
+    enable_MH = false;
+  } else {
+    oop mirror = SystemDictionary::MethodHandle_klass()->java_mirror();
+    MH_class = (jclass) JNIHandles::make_local(env, mirror);
+  }
+
+  if (enable_MH) {
+    ThreadToNativeFromVM ttnfv(thread);
+
+    if (enable_MH) {
+      enable_MH = register_natives(env, MHN_class, MHN_methods, sizeof(MHN_methods)/sizeof(JNINativeMethod));
+    }
+    if (enable_MH) {
+      enable_MH = register_natives(env, MH_class, MH_methods, sizeof(MH_methods)/sizeof(JNINativeMethod));
+    }
+  }
+
+  if (TraceInvokeDynamic) {
+    tty->print_cr("MethodHandle support loaded (using LambdaForms)");
+  }
+
+  if (enable_MH) {
+    MethodHandles::generate_adapters();
+    MethodHandles::set_enabled(true);
+  }
+}
+JVM_END
+
+
+#+END_SRC

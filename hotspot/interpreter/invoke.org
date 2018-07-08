@@ -1,0 +1,87 @@
+#+BEGIN_SRC c++
+void TemplateTable::prepare_invoke(int byte_no,
+                                   Register method,  // linked method (or i-klass)
+                                   Register index,   // itable index, MethodType, etc.
+                                   Register recv,    // if caller wants to see it
+                                   Register flags    // if caller wants to test it
+                                   ) {
+  // determine flags
+  const Bytecodes::Code code = bytecode();
+  const bool is_invokeinterface  = code == Bytecodes::_invokeinterface;
+  const bool is_invokedynamic    = code == Bytecodes::_invokedynamic;
+  const bool is_invokehandle     = code == Bytecodes::_invokehandle;
+  const bool is_invokevirtual    = code == Bytecodes::_invokevirtual;
+  const bool is_invokespecial    = code == Bytecodes::_invokespecial;
+  const bool load_receiver       = (recv  != noreg);
+  const bool save_flags          = (flags != noreg);
+  assert(load_receiver == (code != Bytecodes::_invokestatic && code != Bytecodes::_invokedynamic), "");
+  assert(save_flags    == (is_invokeinterface || is_invokevirtual), "need flags for vfinal");
+  assert(flags == noreg || flags == rdx, "");
+  assert(recv  == noreg || recv  == rcx, "");
+
+  // setup registers & access constant pool cache
+  if (recv  == noreg)  recv  = rcx;
+  if (flags == noreg)  flags = rdx;
+  assert_different_registers(method, index, recv, flags);
+
+  // save 'interpreter return address'
+  __ save_bcp();
+
+  load_invoke_cp_cache_entry(byte_no, method, index, flags, is_invokevirtual, false, is_invokedynamic);
+
+  // maybe push appendix to arguments (just before return address)
+  if (is_invokedynamic || is_invokehandle) {
+    Label L_no_push;
+    __ testl(flags, (1 << ConstantPoolCacheEntry::has_appendix_shift));
+    __ jcc(Assembler::zero, L_no_push);
+    // Push the appendix as a trailing parameter.
+    // This must be done before we get the receiver,
+    // since the parameter_size includes it.
+    __ push(rbx);
+    __ mov(rbx, index);
+    assert(ConstantPoolCacheEntry::_indy_resolved_references_appendix_offset == 0, "appendix expected at index+0");
+    __ load_resolved_reference_at_index(index, rbx);
+    __ pop(rbx);
+    __ push(index);  // push appendix (MethodType, CallSite, etc.)
+    __ bind(L_no_push);
+  }
+
+  // load receiver if needed (after appendix is pushed so parameter size is correct)
+  // Note: no return address pushed yet
+  if (load_receiver) {
+    __ movl(recv, flags);
+    __ andl(recv, ConstantPoolCacheEntry::parameter_size_mask);
+    const int no_return_pc_pushed_yet = -1;  // argument slot correction before we push return address
+    const int receiver_is_at_end      = -1;  // back off one slot to get receiver
+    Address recv_addr = __ argument_address(recv, no_return_pc_pushed_yet + receiver_is_at_end);
+    __ movptr(recv, recv_addr);
+    __ verify_oop(recv);
+  }
+
+  if (save_flags) {
+    __ movl(r13, flags);
+  }
+
+  // compute return type
+  __ shrl(flags, ConstantPoolCacheEntry::tos_state_shift);
+  // Make sure we don't need to mask flags after the above shift
+  ConstantPoolCacheEntry::verify_tos_state_shift();
+  // load return address
+  {
+    const address table_addr = (address) Interpreter::invoke_return_entry_table_for(code);
+    ExternalAddress table(table_addr);
+    __ lea(rscratch1, table);
+    __ movptr(flags, Address(rscratch1, flags, Address::times_ptr));
+  }
+
+  // push return address
+  __ push(flags);
+
+  // Restore flags value from the constant pool cache, and restore rsi
+  // for later null checks.  r13 is the bytecode pointer
+  if (save_flags) {
+    __ movl(flags, r13);
+    __ restore_bcp();
+  }
+}
+#+END_SRC
