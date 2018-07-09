@@ -1,0 +1,90 @@
+#+BEGIN_SRC c++
+// ---------------------------------------------------------------------------
+// Implementation of AdapterHandlerLibrary
+//
+// This library manages argument marshaling adapters and native wrappers.
+// There are 2 flavors of adapters: I2C and C2I.
+//
+// The I2C flavor takes a stock interpreted call setup, marshals the
+// arguments for a Java-compiled call, and jumps to Rmethod-> code()->
+// code_begin().  It is broken to call it without an nmethod assigned.
+// The usual behavior is to lift any register arguments up out of the
+// stack and possibly re-pack the extra arguments to be contigious.
+// I2C adapters will save what the interpreter's stack pointer will be
+// after arguments are popped, then adjust the interpreter's frame
+// size to force alignment and possibly to repack the arguments.
+// After re-packing, it jumps to the compiled code start.  There are
+// no safepoints in this adapter code and a GC cannot happen while
+// marshaling is in progress.
+//
+// The C2I flavor takes a stock compiled call setup plus the target method in
+// Rmethod, marshals the arguments for an interpreted call and jumps to
+// Rmethod->_i2i_entry.  On entry, the interpreted frame has not yet been
+// setup.  Compiled frames are fixed-size and the args are likely not in the
+// right place.  Hence all the args will likely be copied into the
+// interpreter's frame, forcing that frame to grow.  The compiled frame's
+// outgoing stack args will be dead after the copy.
+//
+// Native wrappers, like adapters, marshal arguments.  Unlike adapters they
+// also perform an offical frame push & pop.  They have a call to the native
+// routine in their middles and end in a return (instead of ending in a jump).
+// The native wrappers are stored in real nmethods instead of the BufferBlobs
+// used by the adapters.  The code generation happens here because it's very
+// similar to what the adapters have to do.
+
+class AdapterHandlerEntry : public BasicHashtableEntry<mtCode> {
+
+ private:
+  AdapterFingerPrint* _fingerprint;
+  address _i2c_entry;
+  address _c2i_entry;
+  address _c2i_unverified_entry;
+
+  void init(AdapterFingerPrint* fingerprint, address i2c_entry, address c2i_entry, address c2i_unverified_entry) {
+    _fingerprint = fingerprint;
+    _i2c_entry = i2c_entry;
+    _c2i_entry = c2i_entry;
+    _c2i_unverified_entry = c2i_unverified_entry;
+  }
+};
+
+// A Method* represents a Java method.
+class Method : public Metadata {
+
+ private:
+  ConstMethod*      _constMethod;                // Method read-only data.
+  MethodData*       _method_data;
+  MethodCounters*   _method_counters;
+  AccessFlags       _access_flags;               // Access flags
+  int               _vtable_index;               // vtable index of this method (see VtableIndexFlag)
+                                                 // note: can have vtables with >2**16 elements (because of inheritance)
+
+  u2                _method_size;                // size of this object
+  u1                _intrinsic_id;               // vmSymbols::intrinsic_id (0 == _none)
+  u1                _jfr_towrite          : 1,   // Flags
+                    _caller_sensitive     : 1,
+                    _force_inline         : 1,
+                    _hidden               : 1,
+                    _dont_inline          : 1,
+                    _has_injected_profile : 1,
+                                          : 2;
+
+#ifndef PRODUCT
+  int               _compiled_invocation_count;  // Number of nmethod invocations so far (for perf. debugging)
+#endif
+  // Entry point for calling both from and to the interpreter.
+  address _i2i_entry;           // All-args-on-stack calling convention
+  // Adapter blob (i2c/c2i) for this Method*. Set once when method is linked.
+  AdapterHandlerEntry* _adapter;
+  // Entry point for calling from compiled code, to compiled code if it exists
+  // or else the interpreter.
+  volatile address _from_compiled_entry;        // Cache of: _code ? _code->entry_point() : _adapter->c2i_entry()
+  // The entry point for calling both from and to compiled code is
+  // "_code->entry_point()".  Because of tiered compilation and de-opt, this
+  // field can come and go.  It can transition from NULL to not-null at any
+  // time (whenever a compile completes).  It can transition from not-null to
+  // NULL only at safepoints (because of a de-opt).
+  nmethod* volatile _code;                       // Points to the corresponding piece of native code
+  volatile address           _from_interpreted_entry; // Cache of _code ? _adapter->i2c_entry() : _i2i_entry
+}
+#+END_SRC
