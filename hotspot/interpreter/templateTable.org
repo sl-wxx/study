@@ -20,6 +20,24 @@ class TemplateTable: AllStatic {
   //%note templates_1
   static InterpreterMacroAssembler* _masm;       // the assembler used when generating templates 
 }   
+
+class Template VALUE_OBJ_CLASS_SPEC {
+ private:
+  enum Flags {
+    uses_bcp_bit,                                // set if template needs the bcp pointing to bytecode
+    does_dispatch_bit,                           // set if template dispatches on its own
+    calls_vm_bit,                                // set if template calls the vm
+    wide_bit                                     // set if template belongs to a wide instruction
+  };
+
+  typedef void (*generator)(int arg);
+
+  int       _flags;                              // describes interpreter template properties (bcp unknown)
+  TosState  _tos_in;                             // tos cache state before template execution
+  TosState  _tos_out;                            // tos cache state after  template execution
+  generator _gen;                                // template code generator
+  int       _arg;                                // argument for template code generator
+}
    #+END_SRC
 2. 初始化TemplateTable::_template_table/_template_table_wide
    def函数负责初始化_template_table数组的元素. 代码如下:

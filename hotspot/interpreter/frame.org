@@ -1,21 +1,48 @@
 * 概述
-| offset | interpreter                         | native    | entry               |
-|--------+-------------------------------------+-----------+---------------------|
-|     -8 | initial_sp    : expression stack sp |           |                     |
-|     -7 | bcx (r13)     : bytecode pointer    |           |                     |
-|     -6 | locals (r14)  : locals pointer      |           | call_wrapper_offset |
-|     -5 | cpCache       : constant pool cache |           |                     |
-|     -4 | mdx           : methodData pointer  |           |                     |
-|     -3 | Method*       :                     |           |                     |
-|     -2 | last_sp       :                     |           |                     |
-|     -1 | caller rsp    : sender_sp           |           |                     |
-|      0 | caller rbp/FP : FP points to here.  | old rbp   | arg_reg_save_area   |
-|      1 | return pc     :                     | return pc | return pc           |
-|      2 | oop temp      :                     | args      | sender_sp           |
-|      3 | result handler:                     | args      |                     |
-|      4 | locals & args :                     | args      |                     |
-|        | sender_sp points to here            |           |                     |
-
+frame对应传统语言的栈帧, 在方法调用前创建, 返回后销毁.
+普通方法和native方法的栈帧差别较大, 下面分别说明.
+1. 普通方法
+| 相对于rbp的偏移 | 内容                                | 寄存器    | 说明                |
+|-----------------+-------------------------------------+--------------+---------------------|
+|              -8 | initial_sp    : expression stack sp |              |                     |
+|              -7 | bcx (r13)     : bytecode pointer    |              |                     |
+|              -6 | locals (r14)  : locals pointer      |              | call_wrapper_offset |
+|              -5 | cpCache       : constant pool cache |              |                     |
+|              -4 | mdx           : methodData pointer  |              |                     |
+|              -3 | Method*       :                     |              |                     |
+|              -2 | last_sp       :                     |              |                     |
+|              -1 | caller rsp    : sender_sp           |              |                     |
+|               0 | caller rbp/FP : FP points to here.  |              | arg_reg_save_area   |
+|               1 | return pc     :                     |              | return pc           |
+|               2 | oop temp      :                     |              | sender_sp           |
+|               3 | result handler:                     |              |                     |
+|               4 | locals & args :                     |              |                     |
+|                 | sender_sp points to here            |              |                     |
+2. native方法(如: public native int hashCode())
+| 相对于rbp的偏移 | 内容/值                             | 说明                                      |
+|-----------------+-------------------------------------+-------------------------------------------|
+|              -8 | initial_sp    : expression stack sp |                                           |
+|              -7 | bcx (r13)     : bytecode pointer    |                                           |
+|              -6 | locals (r14)  : locals pointer      | locals                                    |
+|              -5 | cpCache       : constant pool cache |                                           |
+|              -4 | mdx           : methodData pointer  |                                           |
+|              -3 | Method*       :                     |                                           |
+|              -2 | last_sp       :                     |                                           |
+|              -1 | caller rsp    : sender_sp           |                                           |
+|               0 | caller rbp/FP : FP points to here.  | arg_reg_save_area                         |
+|               1 | return pc     :                     | return pc                                 |
+|               2 | oop temp      :                     | sender_sp                                 |
+|               3 | result handler:                     |                                           |
+|               4 | locals & args :                     |                                           |
+|                 | sender_sp points to here            |                                           |
+|             ... | ...                                 | locals(包括函数形参和局部变量)            |
+|               5 | param2                              |                                           |
+|               4 | parma1                              |                                           |
+|                 | result_handler: NULL                | 用于转换native类型和java类型. 如: boolean |
+|                 | oop_temp: NULL                      | ???                                       |
+|                 | ret address                         | 返回地址                                  |
+|                 | rbp/frame pointer                   | push rbp, mov rbp rsp                     |
+|                 | sender_sp                           |                                           |
 1. 对所有类型的frame, offset为1的位置是返回地址, 由call指令push到栈上.
 2. offset为1的位置对entry类型以外的frame都是调用者的rbp, 这符合传统的函数调用惯例.
 3. interpreter frame 在传统函数调用惯例的基础上进行了扩展添加和很多其他的内容.
