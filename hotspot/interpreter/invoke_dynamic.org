@@ -1,0 +1,5 @@
+* 基本概念
+1. https://www.infoq.com/articles/Invokedynamic-Javas-secret-weapon
+2. https://docs.oracle.com/javase/7/docs/technotes/guides/vm/multiple-language-support.html
+
+

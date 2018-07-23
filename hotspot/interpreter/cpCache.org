@@ -1,3 +1,29 @@
+* 概述
+cpCache用于记录已经解析过的字段或方法.包括4个成员: _indices, _f1, _f2, _flags
+1. 字段类型
+   #+begin_example
+bit number |31                                                               0|
+bit length |-------8------|-------------8------------|-----------16-----------|
+-------------------------------------------------------------------
+_indices   [ bytecode put | bytecode get             | constant_pool_index    ]
+_f1        [ field holder class (as java.lang.Class not Klass*)               ] 
+_f2        [ field offset in bytes                                            ] 
+_flags     [tos|0|F=1|0|0 |0|final?|volatile?|0 |0000|    field_index         ]
+bit length [ 4 |1| 1 |1|1 |1|1     |1        |1 |-4--|-----------16-----------]
+   #+end_example
+2. 方法类型
+   #+begin_example
+bit number |31                                                               0|
+bit length |-------8------|-------------8------------|-----------16-----------|
+-------------------------------------------------------------------
+_indices   [ bytecode put | bytecode get             | constant_pool_index    ]
+_f1        [ field holder class (as java.lang.Class not Klass*)               ] 
+_f2        [ field offset in bytes                                            ] 
+_flags     [tos|0|F=0|M|A |I|final?|0        |vf|0000|00000000|  param size   ]
+bit length [ 4 |1| 1 |1|1 |1|1     |1        |1 |-4--|---8----|-------8-------]
+   #+end_example
+
+* 源码
 #+BEGIN_SRC c++
 // The ConstantPoolCache is not a cache! It is the resolution table that the
 // interpreter uses to avoid going into the runtime and a way to access resolved
@@ -38,7 +64,7 @@
 // vf     = virtual but final (method entries only: is_vfinal())
 //
 // The flags after TosState have the following interpretation:
-// bit 27: 0 for fields, 1 for methods
+// bit 26: 0 for fields, 1 for methods
 // f  flag true if field is marked final
 // v  flag true if field is volatile (only for fields)
 // f2 flag true if f2 contains an oop (e.g., virtual final method)

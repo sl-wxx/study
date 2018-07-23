@@ -1,8 +1,11 @@
 * 概述
 1. rsp = last_sp, last_sp = NULL
-2. restore bcp(r13) 和 locals(r14)
-3. 参数出栈 rsp = rsp + parms_size*stackElementScale.
-4. dispatch_next(state, step)
+2. 从栈上恢复bcp(r13)
+   栈上的r13是由invoke指令保存的, 指向invoke指令本身, 如invokestatic
+3. 从栈上恢复locals(r14)
+4. 参数出栈 rsp = rsp + parms_size*stackElementScale.
+5. dispatch_next(state, step)
+   结合2中restore_bcp, dispatch_next恰好跳过invoke指令
 
 * 源码
 ** 初始化
@@ -91,100 +94,10 @@ void InterpreterMacroAssembler::get_cache_index_at_bcp(Register index,
 
 #+END_SRC
 
-** 调用
-#+BEGIN_SRC c++
-/**
- * Returns the return entry address for the given top-of-stack state and bytecode.
- */
-address TemplateInterpreter::return_entry(TosState state, int length, Bytecodes::Code code) {
-  guarantee(0 <= length && length < Interpreter::number_of_return_entries, "illegal length");
-  const int index = TosState_as_index(state);
-  switch (code) {
-  case Bytecodes::_invokestatic:
-  case Bytecodes::_invokespecial:
-  case Bytecodes::_invokevirtual:
-  case Bytecodes::_invokehandle:
-    return _invoke_return_entry[index];
-  case Bytecodes::_invokeinterface:
-    return _invokeinterface_return_entry[index];
-  case Bytecodes::_invokedynamic:
-    return _invokedynamic_return_entry[index];
-  default:
-    assert(!Bytecodes::is_invoke(code), err_msg("invoke instructions should be handled separately: %s", Bytecodes::name(code)));
-    return _return_entry[length].entry(state);
-  }
-}
-
-/**
- * If a deoptimization happens, this function returns the point of next bytecode to continue execution.
- */
-address AbstractInterpreter::deopt_continue_after_entry(Method* method, address bcp, int callee_parameters, bool is_top_frame) {
-  assert(method->contains(bcp), "just checkin'");
-
-  // Get the original and rewritten bytecode.
-  Bytecodes::Code code = Bytecodes::java_code_at(method, bcp);
-  assert(!Interpreter::bytecode_should_reexecute(code), "should not reexecute");
-
-  const int bci = method->bci_from(bcp);
-
-  // compute continuation length
-  const int length = Bytecodes::length_at(method, bcp);
-
-  // compute result type
-  BasicType type = T_ILLEGAL;
-
-  switch (code) {
-    case Bytecodes::_invokevirtual  :
-    case Bytecodes::_invokespecial  :
-    case Bytecodes::_invokestatic   :
-    case Bytecodes::_invokeinterface: {
-      Thread *thread = Thread::current();
-      ResourceMark rm(thread);
-      methodHandle mh(thread, method);
-      type = Bytecode_invoke(mh, bci).result_type();
-      // since the cache entry might not be initialized:
-      // (NOT needed for the old calling convension)
-      if (!is_top_frame) {
-        int index = Bytes::get_native_u2(bcp+1);
-        method->constants()->cache()->entry_at(index)->set_parameter_size(callee_parameters);
-      }
-      break;
-    }
-
-   case Bytecodes::_invokedynamic: {
-      Thread *thread = Thread::current();
-      ResourceMark rm(thread);
-      methodHandle mh(thread, method);
-      type = Bytecode_invoke(mh, bci).result_type();
-      // since the cache entry might not be initialized:
-      // (NOT needed for the old calling convension)
-      if (!is_top_frame) {
-        int index = Bytes::get_native_u4(bcp+1);
-        method->constants()->invokedynamic_cp_cache_entry_at(index)->set_parameter_size(callee_parameters);
-      }
-      break;
-    }
-
-    case Bytecodes::_ldc   :
-    case Bytecodes::_ldc_w : // fall through
-    case Bytecodes::_ldc2_w:
-      {
-        Thread *thread = Thread::current();
-        ResourceMark rm(thread);
-        methodHandle mh(thread, method);
-        type = Bytecode_loadconstant(mh, bci).result_type();
-        break;
-      }
-
-    default:
-      type = Bytecodes::result_type(code);
-      break;
-  }
-
-  // return entry point for computed continuation state & bytecode length
-  return
-    is_top_frame
-    ? Interpreter::deopt_entry (as_TosState(type), length)
-    : Interpreter::return_entry(as_TosState(type), length, code);
-}
-#+END_SRC
+** 使用
+1. invoke指令对应的return_entry
+   2. invoke指令(invokestatic等)会根据tos和invoke指令类型计算函数返回值, 并push到栈上.
+      这个函数返回值即为return_entry
+   3. 函数返回时跳转到栈上的return_entry
+2. 普通字节码指令对应的return_entry
+   普通字节码指令对应的return_entry会在deopt时调用, 待补传.

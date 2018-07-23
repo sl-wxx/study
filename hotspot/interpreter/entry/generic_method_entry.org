@@ -11,31 +11,41 @@
    #+end_example
 
 * 起始状态
-  | 栈             | 说明 | 寄存器          | 说明                    |
-  |----------------+------+-----------------+-------------------------|
-  | return address |      | rbx=Method*     | Method* 表示Java method |
-  | param1         |      | r13 = sender sp |                         |
-  | param2         |      |                 |                         |
-  | ......         |      |                 |                         |
+
+  rbx=Method*, r13 = sender_sp
+
+  | 栈             |
+  |----------------|
+  | ...            |
+  | param2         |
+  | param1         |
+  | return address |
+  | ...            |
+
 
 * 最终状态
-  | 栈                | 说明                                                | 寄存器 | 说明 |
-  |-------------------+-----------------------------------------------------+--------+------|
-  | Monitor 相关      | 只对synchronize方法才有这部分                       |        |      |
-  | 0                 | reserve word for pointer to expression stack bottom |        |      |
-  | r13               | bcp: bytecode pointer. 0 for native frame           |        |      |
-  | r14               | pointer to locals                                   |        |      |
-  | cpCache           | Method*.constMethod.constantPool._cache             |        |      |
-  | mdp               | Method*.methodData.data_offset                      |        |      |
-  | rbx               | Method*                                             |        |      |
-  | NULL_WORD         | last_sp                                             |        |      |
-  | r13               | sender sp                                           |        |      |
-  | old rbp           | the caller's rbp                                    |        |      |
-  | return pc         | pushed by call                                      |        |      |
-  | locals and params |                                                     |        |      |
+r13 = Method*->constMethod*->bytecodes
+| 栈结构           | 说明                                                                           |
+|------------------+--------------------------------------------------------------------------------|
+| ...              |                                                                                |
+| param2           |                                                                                |
+| param1           |                                                                                |
+| local variable 1 | 预先为函数局部变量在栈上分配空间并被初始化为NULL                               |
+| local variable 2 |                                                                                |
+| ...              |                                                                                |
+| ret address      | 返回地址                                                                       |
+| rbp/fp           | push rbp, mov rbp rsp. 此处的rbp是调用者的rbp与下面的sender_sp一起用于函数返回 |
+| sender_sp        | 调用者rsp, 最终返回时会设置rsp为sender_sp                                      |
+| last_sp          | 调用该native函数的普通函数的sp  ???                                            |
+| Method*          | 函数指针, 可以通过该指针找到参数个数/native方法体等, 对应rbx                   |
+| Mdp              | method data pointer, 用于profile                                               |
+| cpCache          |                                                                                |
+| locals pointer   | 对应寄存器r14                                                                  |
+| bcp/bcx          | bcp/bcx: byte code pointer, 对应寄存器r13                                      |
+| initial_sp       | expression stack bottom: interpreter内部使用, 如monitor. 初始值置为rsp         |
 
 * 代码说明
-  1. 起始状态: rbx=Method*, r13=sender sp, 栈的结构如上表.
+  1. 起始状态: rbx=Method*, r13=sender_sp
   2. locals包含函数局部变量和形参.形参在开始时已经位于栈上, 并紧邻return address.
      这里先将return address pop到rax, 然后在栈上为局部变量分配空间并初始化为0.
      最终的结果是局部变量和形参都位于栈上并相邻. 同时令r14=locals. 

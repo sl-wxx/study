@@ -1,3 +1,24 @@
+* 概述
+** 流程
+invokestatic -> method_entry -> method bytecodes -> return_entry
+** 初始状态
+1. r13记录了当前字节码指令(invokestatic), 即r13 = bcp
+2. 栈上记录了cpCache
+** 具体操作
+1. prepare_invoke
+   1. 将r13保存到栈上供return_entry使用.
+   2. r13记录了当前字节码指令invokestatic, 紧接着的是2字节的索引. 该索引指向cpCache中方法信息
+   3. 栈上记录了cpCache的基址, 加上1中的索引即可找到对应的方法
+   4. 如果该方法尚未解析则进行解析
+   5. prepare_invoke是所有invoke指令(invokecdynamic等)共用的, 所以还会处理reciever和appendix args
+      invokestatic不需要处理这些.
+   6. 根据invoke指令类型和TOS信息计算返回地址, 并push到栈上.
+      注意这里的返回地址并不是下一条字节码的地址, 而是一个return_entry.
+      它是一段通用的代码, 会处理好TOS, invoke指令后的参数等. 参见return_entry.org
+2. jump_from_interpreted
+   1. 设置栈上last_sp指向栈上返回地址所在的位置
+   2. 跳转到方法的_from_interpreted_entry. 参见: method_entry.org
+* 源码
 #+BEGIN_SRC c++
 void TemplateTable::invokestatic(int byte_no) {
   transition(vtos, vtos);
@@ -153,5 +174,12 @@ void InterpreterMacroAssembler::jump_from_interpreted(Register method, Register 
 
   jmp(Address(method, Method::from_interpreted_offset()));
 
+}
+
+void InterpreterMacroAssembler::prepare_to_jump_from_interpreted() {
+  // set sender sp
+  lea(r13, Address(rsp, wordSize));
+  // record last_sp
+  movptr(Address(rbp, frame::interpreter_frame_last_sp_offset * wordSize), r13);
 }
 #+END_SRC

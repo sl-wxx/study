@@ -4,42 +4,42 @@
 3. 普通方法会在参数和返回地址之间为局部变量预分配空间并初始化为NULL
    而native方法会放result_handler和oop_temp.
 1. 普通方法
-| 栈结构                | 说明                                                                   |
-|-----------------------+------------------------------------------------------------------------|
-| ...                   |                                                                        |
-| param2                |                                                                        |
-| param1                |                                                                        |
-| local variable 1      | 预先为函数局部变量在栈上分配空间并被初始化为NULL           |
-| local variable 2      |                                                                        |
-| ...                   |                                                                        |
-| ret address           | 返回地址                                                               |
-| rbp/fp                | push rbp, mov rbp rsp                                                  |
-| sender_sp             | 调用者rsp, 最终返回时会设置rsp为sender_sp                              |
-| last_sp               | 调用该native函数的普通函数的sp  ???                                    |
-| Method* (rbx)         | 函数指针, 可以通过该指针找到参数个数/native方法体等                    |
-| Mdp                   | method data pointer, 用于profile                                       |
-| cpCache               |                                                                        |
-| params/locals pointer | 对应寄存器r14                                                          |
-| bcp/bcx               | bcp/bcx: byte code pointer, 对应寄存器r13                                |
-| initial_sp            | expression stack bottom: interpreter内部使用, 如monitor. 初始值置为rsp |
+| 栈结构           | 说明                                                                           |
+|------------------+--------------------------------------------------------------------------------|
+| ...              |                                                                                |
+| param2           |                                                                                |
+| param1           |                                                                                |
+| local variable 1 | 预先为函数局部变量在栈上分配空间并被初始化为NULL                               |
+| local variable 2 |                                                                                |
+| ...              |                                                                                |
+| ret address      | 返回地址                                                                       |
+| rbp/fp           | push rbp, mov rbp rsp. 此处的rbp是调用者的rbp与下面的sender_sp一起用于函数返回 |
+| sender_sp        | 调用者rsp, 最终返回时会设置rsp为sender_sp                                      |
+| last_sp          | 调用该native函数的普通函数的sp  ???                                            |
+| Method*          | 函数指针, 可以通过该指针找到参数个数/native方法体等, 对应rbx                   |
+| Mdp              | method data pointer, 用于profile                                               |
+| cpCache          |                                                                                |
+| locals pointer   | 对应寄存器r14                                                                  |
+| bcp/bcx          | bcp/bcx: byte code pointer, 对应寄存器r13                                      |
+| initial_sp       | expression stack bottom: interpreter内部使用, 如monitor. 初始值置为rsp         |
 2. native方法(如: public native int hashCode())
-| 栈结构         | 说明                                                                          |
-|----------------+-------------------------------------------------------------------------------|
-| ...            |                                                                               |
-| param2         |                                                                               |
-| parma1         |                                                                               |
-| result_handler | 用于转换native类型和java类型. 如: boolean/char等                              |
-| oop_temp       | 临时变量, static native方法传参和result_handler会用到                         |
-| ret address    | 返回地址                                                                      |
+| 栈结构         | 说明                                                                           |
+|----------------+--------------------------------------------------------------------------------|
+| ...            |                                                                                |
+| param2         |                                                                                |
+| parma1         |                                                                                |
+| result_handler | 用于转换native类型和java类型. 如: boolean/char等                               |
+| oop_temp       | 临时变量, static native方法传参和result_handler会用到                          |
+| ret address    | 返回地址                                                                       |
 | rbp/fp         | push rbp, mov rbp rsp. 此处的rbp是调用者的rbp与下面的sender_sp一起用于函数返回 |
-| sender_sp      | 调用者rsp, 最终返回时会设置rsp为sender_sp                                     |
-| last_sp        | 调用该native函数的普通函数的sp   ???                                          |
-| Method* (rbx)  | 函数指针, 可以通过该指针找到参数个数/native方法体等                           |
-| Mdp            | method data pointer, 用于profile                                              |
-| cpCache        |                                                                               |
-| params pointer | 对应寄存器r14                                                                 |
-| 0              | bcp/bcx: byte code pointer, native不需要bcp, 置为0                            |
-| initial_sp     | expression stack bottom: 解释器内部使用, 如monitor, 异常处理等. 初始值置为rsp |
+| sender_sp      | 调用者rsp, 最终返回时会设置rsp为sender_sp                                      |
+| last_sp        | 调用该native函数的普通函数的sp   ???                                           |
+| Method*        | 函数指针, 可以通过该指针找到参数个数/native方法体等, 对应rbx                   |
+| Mdp            | method data pointer, 用于profile                                               |
+| cpCache        |                                                                                |
+| params pointer | 对应寄存器r14                                                                  |
+| 0              | bcp/bcx: byte code pointer, native不需要bcp, 置为0                             |
+| initial_sp     | expression stack bottom: 解释器内部使用, 如monitor, 异常处理等. 初始值置为rsp  |
 
 * 源码
 建立栈帧结构的代码在method_entry中, 主要是generate_normal_entry和generate_native_entry.
