@@ -1,16 +1,20 @@
 * 概述
 ** 功能
-SlowSignatureHandler负责java方法调用前的参数处理. 
-即: 按照java方法描述符提供的信息解析参数, 并赋值给传参寄存器. 
-如: (IDLjava/lang/Thread;)Ljava/lang/Object; 参见JVMS 4.3 Descriptor.
-** 实现
-实现主要分为2个部分:
-1. generate_slow_signature_handler
-   1. 为InterpreterRuntime::slow_signature_handler准备参数并调用它.
-   2. 将slow_signature_handler生成的中间结果(参数栈)进一步处理, 并赋值到传参寄存器中.
+Java的native方法是普通Java方法和真正的native函数(比如C语言函数)之间媒介.
+它需要获取到C语言函数需要的参数值, 并以C语言函数能够理解的方式传参.
+slow_signature_handler就负责完成这个功能.
+
+以public native int fff(double x)为例, 其method discriptor为: (D)I (参见JVMS 4.3.3)
+1. 根据方法描述符 (D)I 从栈上获取参数值
+2. 按照System V AMD64 ABI规范将获取的参数值传给真正的native函数.
+3. System V AMD64 ABI 规范 参见: call_convention.org
+
+** 实现简析
+1. 为InterpreterRuntime::slow_signature_handler准备参数并调用它.
 2. InterpreterRuntime::slow_signature_handler
    负责具体的解析工作, 并将结果保存在栈上.重点在pass_xxx方法.
-* 代码
+3. 将slow_signature_handler生成的中间结果(参数栈)进一步处理, 并赋值到传参寄存器中.
+* 源码
    #+BEGIN_SRC c++
 address AbstractInterpreterGenerator::generate_slow_signature_handler() {
   address entry = __ pc();

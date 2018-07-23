@@ -1,3 +1,4 @@
+* 参数/寄存器对应关系
 #+begin_example
      |-------------------------------------------------------|
      | c_rarg0   c_rarg1  c_rarg2 c_rarg3 c_rarg4 c_rarg5    |
@@ -7,6 +8,8 @@
      |-------------------------------------------------------|
      | j_rarg5   j_rarg0  j_rarg1 j_rarg2 j_rarg3 j_rarg4    |
      |-------------------------------------------------------|
+    
+     通常r14=locals, r13=bcp(类似eip), rbx=Method*
 #+end_example
 
 * System V AMD64 ABI
@@ -19,6 +22,7 @@ For leaf-node functions (functions which do not call any other function(s)), a 1
 If the callee is a variadic function, then the number of floating point arguments passed to the function in vector registers must be provided by the caller in the RAX register.
 
 Unlike the Microsoft calling convention, a shadow space is not provided; on function entry, the return address is adjacent to the seventh integer argument on the stack.
+
 
 * 概述
   JVM中的函数有interpreted和compiled两种情况, 对应的调用情况分4种: i2i/i2c/c2i/c2c
