@@ -1,0 +1,33 @@
+| 技能名称              | 次数 |
+|-----------------------+------|
+| spring cloud          |    3 |
+| 数据库                |    16 |
+| dubbo                 |    6 |
+| zookeeper             |    4 |
+| MQ/kafka              |    13 |
+| 算法/数据结构         |    3 |
+| 设计模式/UML          |    9 |
+| 负载均衡/nginx        |    6 |
+| 缓存/redis            |    15 |
+| 多线程/高并发         |    11 |
+| 网络                  |    3 |
+| restful               |    4 |
+| NIO                   |    8 |
+| 性能优化/线上故障处理 |    4 |
+| 分布式                |    7 |
+| JVM原理/垃圾回收        |   5  |
+| 操作系统/shell        |    9 |
+| hadoop/spark/storm    |    4 |
+
+总结一下: 
+1. 数据库(mysql)
+2. 缓存redis
+3. MQ
+4. 多线程
+5. 设计模式UML
+6. linux/shell
+7. NIO
+8. 分布式
+9. 微服务dubbo/zookeeper
+10. 负载均衡nginx
+11. JVM
