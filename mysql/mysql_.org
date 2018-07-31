@@ -1,0 +1,25 @@
+* 关系代数
+** 常用操作
+join, union, selection, projection
+**  ER Model
+多对一, 一对多, 多对多
+** 范式(normal form)
+1NF: if all attributes are atomic.
+2NF: 
+BCNF:
+3NF:
+4NF:
+
+* 数据存储
+** 存储结构
+** 索引
+** 查询优化
+
+* 并发控制
+** 事务
+** 实现
+*** 两阶段锁
+*** 多版本
+** 恢复
+
+* 系统架构
