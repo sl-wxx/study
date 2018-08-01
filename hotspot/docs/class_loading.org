@@ -1,0 +1,64 @@
+* 概述
+1. Loading is the process of finding the binary representation of a class
+   or interface type with a particular name and creating a class or interface from
+   that binary representation.
+2. Linking is the process of taking a class or interface and combining it 
+   into the run-time state of the Java Virtual Machine so that it can be executed.
+3. Initialization of a class or interface consists of executing the class or
+   interface initialization method <clinit>.
+
+** Loading
+1. 关联加载
+   加载某个类时会同时加载其常量池中引用的所有其他类, 这些被被关联的类又会加载其各自关联的类.
+   所以加载一个类可能会递归触发加载很多类.
+2. 代理
+   如果每个类加载器都独自加载所有关联类, 显然会造成重复.所以为每个类加载器都指定一个父类加载器, 
+   子类加载器可以指定由其父类加载器加载某些类.这样就形成了一个层级, 底层的类(Object, String)等
+   由系统类加载器(bootstrap, ext, app)加载, 而应用层面的类可以由用户自定义的类加载器加载.
+3. 类型安全
+   发起加载的类加载器称为Initial classloader(loadClass), 而实际定义类的类加载器称为define 
+   classloader(defineClass), 这里记为DC.在JVM内部类型实际是由类名+DC一起决定的. 即:
+   相同类名但不同DC不是一种类型. 
+** Linking
+Linking a class or interface involves verifying and preparing that class or interface,
+its direct superclass, its direct superinterfaces, and its element type (if it is an array
+type), if necessary. Resolution of symbolic references in the class or interface is
+an optional part of linking.
+1. Verification
+   ensures that the binary representation of a class or interface is structurally correct.
+   Verification may cause additional classes and interfaces to be loaded but need not 
+   cause them to be verified or prepared.
+2. Preparation
+   involves creating the static fields for a class or interface and initializing
+   such fields to their default values.
+3. Resolution
+   The Java Virtual Machine instructions anewarray, checkcast, getfield, getstatic, instanceof,
+   invokedynamic, invokeinterface, invokespecial, invokestatic, invokevirtual, ldc, ldc_w,
+   multianewarray, new, putfield, and putstatic make symbolic references to the run-time constant
+   pool. Execution of any of these instructions requires resolution of its symbolic reference.
+
+** Initialization
+Initialization of a class or interface consists of executing its class or interface initialization
+method.
+
+A class or interface C may be initialized only as a result of:
+1. If C is a class, its designation as the initial class at Java Virtual Machine startup. (main 方法)
+2. If C is a class, the initialization of one of its subclasses.
+3. If C is an interface that declares a non- abstract , non- static method, the
+   initialization of a class that implements C directly or indirectly.
+4. Invocation of certain reflective methods in the class library (§2.12), for example,
+   in class Class or in package java.lang.reflect
+5. The execution of any one of the Java Virtual Machine instructions new,
+   getstatic, putstatic, or invokestatic that references C (§new, §getstatic, §putstatic,
+   §invokestatic). These instructions reference a class or interface directly or
+   indirectly through either a field reference or a method reference.
+6. The first invocation of a java.lang.invoke.MethodHandle instance which
+   was the result of method handle resolution (§5.4.3.5) for a method handle
+   of kind 2 ( REF_getStatic ), 4 ( REF_putStatic ), 6 ( REF_invokeStatic ), or 8
+   ( REF_newInvokeSpecial ).
+
+* 热替换简单实现
+1. 对需要替换的类定义一个接口, 并由BaseClassloader加载该接口及该接口的参数和返回类型.
+2. 自定义类加载器定义替换类, 并将替换类引用的所有其他类代理给BaseClassloader加载, 
+   以保证类型兼容.
+3. demo参见: https://github.com/sl-wxx/java_class_loader

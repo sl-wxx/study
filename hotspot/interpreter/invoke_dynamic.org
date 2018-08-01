@@ -2,4 +2,5 @@
 1. https://www.infoq.com/articles/Invokedynamic-Javas-secret-weapon
 2. https://docs.oracle.com/javase/7/docs/technotes/guides/vm/multiple-language-support.html
 
-
+The feature's main goal was to create a bytecode to handle a new type of method dispatch - that essentially allows application-level code to determine which method a call will execute, and to do so only when the call is about to execute. 
+The general idea is that each invokedynamic instruction is associated with a special method (known as a bootstrap method or BSM). When the invokedynamic instruction is reached by the interpreter, the BSM is called. It returns an object (a CallSite containing a MethodHandle) that indicates which method the call site should actually execute.

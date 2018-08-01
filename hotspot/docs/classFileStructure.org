@@ -1,0 +1,173 @@
+* ClassFile
+#+BEGIN_SRC c++
+ClassFile {
+u4                  magic;                                  
+u2                  minor_version;                          
+u2                  major_version;                          
+u2                  constant_pool_count;                    
+cp_info             constant_pool[constant_pool_count-1];   
+u2                  access_flags;                           
+u2                  this_class;                             
+u2                  super_class;                            
+u2                  interfaces_count;                       
+u2                  interfaces[interfaces_count];           
+u2                  fields_count;                           
+field_info          fields[fields_count];                   
+u2                  methods_count;                          
+method_info         methods[methods_count];                 
+u2                  attributes_count;                       
+attribute_info      attributes[attributes_count];                                                   
+}
+#+END_SRC
+* Discriptor
+** Field Discriptor
+#+begin_example
+FieldDescriptor: FieldType
+
+FieldType:
+    BaseType/ObjectType/ArrayType
+
+BaseType: (one of) B C D F I J S Z
+
+ObjectType: L ClassName ;
+
+ArrayType: [ ComponentType
+ComponentType: FieldType
+#+end_example
+** Method Discriptor
+#+begin_example
+MethodDescriptor:( {ParameterDescriptor} ) ReturnDescriptor
+
+ParameterDescriptor: FieldType
+
+ReturnDescriptor: FieldType
+
+VoidDescriptor: V
+
+Object m(int i, double d, Thread t) {}
+(IDLjava/lang/Thread;)Ljava/lang/Object;
+#+end_example
+
+* Constant Pool
+#+BEGIN_SRC c++
+cp_info {
+    u1 tag;
+    u1 info[];
+}
+#+END_SRC
+| Tag_Type                    | Tag_Value | info                                                |
+| CONSTANT_Class              |         7 | name_index                                          |
+| CONSTANT_Fieldref           |         9 | class_index + nameAndType_index                     |
+| CONSTANT_Methodref          |        10 | class_index + nameAndType_index                     |
+| CONSTANT_InterfaceMethodref |        11 | class_index + nameAndType_index                     |
+| CONSTANT_String             |         8 | Utf8_index                                          |
+| CONSTANT_Integer            |         3 | numeric value                                       |
+| CONSTANT_Float              |         4 | numeric value                                       |
+| CONSTANT_Long               |         5 | numeric value                                       |
+| CONSTANT_Double             |         6 | numeric value                                       |
+| CONSTANT_NameAndType        |        12 | utf8_index1(for name) + utf8_index2(for discriptor) |
+| CONSTANT_Utf8               |         1 | length + bytes[]                                    |
+| CONSTANT_MethodHandle       |        15 |                                                     |
+| CONSTANT_MethodType         |        16 | utf8_index: for method discriptor                   |
+| CONSTANT_InvokeDynamic      |        18 |                                                     |
+
+** CONSTANT_MethodHandle
+#+BEGIN_SRC c++
+CONSTANT_MethodHandle_info {
+    u1 tag;
+    u1 reference_kind;
+    u2 reference_index;
+}
+#+END_SRC
+1. reference_kind
+   The value of the reference_kind item must be in the range 1 to 9. The
+   value denotes the kind of this method handle, which characterizes its bytecode behavior.
+2. reference_index
+   The value of the reference_index item must be a valid index into the
+   constant_pool table. The constant_pool entry at that index must be as follows:
+   1. If the value of the reference_kind item is 1 ( REF_getField ), 2
+      ( REF_getStatic ), 3 ( REF_putField ), or 4 ( REF_putStatic ), then the
+      constant_pool entry at that index must be a CONSTANT_Fieldref_info
+      structure representing a field for which a method handle is to be created.
+   2. If the value of the reference_kind item is 5 ( REF_invokeVirtual ) or 8
+      ( REF_newInvokeSpecial ), then the constant_pool entry at that index must 
+      be a CONSTANT_Methodref_info structure (§4.4.2) representing a class's
+      method or constructor (§2.9) for which a method handle is to be created.
+   3. If the value of the reference_kind item is 6 ( REF_invokeStatic )
+      or 7 ( REF_invokeSpecial ), then if the class file version number
+      is less than 52.0, the constant_pool entry at that index must be
+      a CONSTANT_Methodref_info structure representing a class's method
+      for which a method handle is to be created; if the class file
+      version number is 52.0 or above, the constant_pool entry at that
+      index must be either a CONSTANT_Methodref_info structure or a
+      CONSTANT_InterfaceMethodref_info structure (§4.4.2) representing a
+      class's or interface's method for which a method handle is to be created.
+   4. If the value of the reference_kind item is 9 ( REF_invokeInterface ),
+      then the constant_pool entry at that index must be a CONSTANT_InterfaceMethodref 
+      structure representing an interface's method for which a method handle is to be created.
+
+** CONSTANT_InvokeDynamic
+#+BEGIN_SRC c++
+CONSTANT_InvokeDynamic_info {
+    u1 tag;
+    u2 bootstrap_method_attr_index;
+    u2 name_and_type_index;
+}
+#+END_SRC
+1. bootstrap_method_attr_index
+   The value of the bootstrap_method_attr_index item must be a valid index
+   into the bootstrap_methods array of the bootstrap method table (§4.7.23) of
+   this class file.
+2. name_and_type_index
+   The value of the name_and_type_index item must be a valid index into
+   the constant_pool table. The constant_pool entry at that index must be a
+   CONSTANT_NameAndType_info structure (§4.4.6) representing a method name
+   and method descriptor (§4.3.3).
+
+* Fields
+#+BEGIN_SRC c++
+field_info {
+    u2                access_flags;                
+    u2                name_index;                  
+    u2                descriptor_index;            
+    u2                attributes_count;            
+    attribute_info    attributes[attributes_count];                                  
+}
+#+END_SRC
+
+* Methods
+#+BEGIN_SRC c++
+method_info {
+    u2               access_flags;                
+    u2               name_index;                  
+    u2               descriptor_index;            
+    u2               attributes_count;            
+    attribute_info   attributes[attributes_count];                         
+}
+#+END_SRC
+
+* Attributes
+#+BEGIN_SRC c++
+attribute_info {
+    u2 attribute_name_index;
+    u4 attribute_length;
+    u1 info[attribute_length];
+}
+#+END_SRC
+| Type                      | Value                    | Description                               |
+|---------------------------+--------------------------+-------------------------------------------|
+| ConstantValue             | String/int/long... index | constant expression                       |
+| Code                      |                          | represent bytecodes and related info      |
+| StackMapTable             |                          | used during verification by type checking |
+| Exceptions                |                          | checked exceptions a method may throw     |
+| InnerClasses              |                          |                                           |
+| EnclosingMethod           |                          | for local/anonymous                       |
+| Synthetic                 |                          | for <init>/<clinit>                       |
+| Signature                 |                          | for generic type                          |
+| SourceFile                |                          |                                           |
+| LineNumTable              |                          |                                           |
+| LocalVariableTable        |                          |                                           |
+| Deprecated                |                          |                                           |
+| RuntimeVisibleAnnotations |                          |                                           |
+| BootstrapMethods          |                          |                                           |
+| MethodParameters          |                          | method formal parmas info (name etc.)     |
