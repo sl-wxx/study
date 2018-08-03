@@ -10,20 +10,100 @@
 内存模型就是通过说明什么场景可以乱序执行, 或者说什么场景必须顺序执行来描述平衡点的. 
 这也是理解内存模型的关键. 具体到实际描述, 又可以分为2步:
   1. 先建立单线程(单核心)模型
-     单线程模型相对简单, 通常都是要求程序执行的结果和顺序执行相同. 
+     单线程模型相对简单, 通常都是要求程序执行的结果和顺序执行相同.
+     #+BEGIN_SRC java
+     int a, b, c;
+     a = 2;  
+     b = 3;
+     c = a;
+// 这里的最终结果是: a=2, b=3, c=2. 以下执行顺序调整都是合法的.
+// a=2; c=a; b=3;
+// b=3; a=2; c=a;
+     #+END_SRC
   2. 再扩展到多线程(多核心)
      多线程模型下的场景又可以分为2类:
      1. 不影响其他线程的行为
-        不影响其他线程的也很简单, 通常按单线程模型处理
+        不影响其他线程的很简单, 通常按单线程模型处理
      2. 影响其他线程的行为
-        这一部分通常是一个具体的内存模型描述的重点. 要描述这一部分, 先要弄清楚会发生怎样的影响.
-        以Java内存模型为例, 可能的影响有:
-            1. 启动线程: 发生启动与被启动的联系
-            2. 线程终止: 发生终止与被观察到终止的联系
-            3. 共享变量: 又可以细分为共享普通变量, 共享volatile变量, 共享锁(锁可以简单理解为特殊变量)
-            4. 其他.....
-        内存模型只要对可能的影响逐一规定其顺序即可.
+        要描述这一部分, 先要弄清楚哪些行为会影响其他线程.
+        典型的影响其他线程的行为有: 修改共享变量, 启动/打断/唤醒其他线程等.
+* Java 内存模型
+
+* 内存模型的应用
+对内存模型的应用主要是线程间会互相影响的部分.下面以CopyOnWriteArrayList为例说明.
+#+BEGIN_SRC java
+// 这里从jdk源码中拷贝出要分析的部分.
+class CopyOnWriteArrayList {
+    private transient volatile Object[] array;
+    
+    private E get(Object[] a, int index) {
+        return (E) a[index];
+    }
+    
+    public E set(int index, E element) {
+        final ReentrantLock lock = this.lock;
+        lock.lock();
+        try {
+            Object[] elements = getArray();
+            E oldValue = get(elements, index);
+    
+            if (oldValue != element) {
+                int len = elements.length;
+                Object[] newElements = Arrays.copyOf(elements, len);
+                newElements[index] = element;
+                setArray(newElements);
+            } else {
+                // Not quite a no-op; ensures volatile write semantics
+                setArray(elements);  // 这里是分析的重点.
+            }
+            return oldValue;
+        } finally {
+            lock.unlock();
+        }
+    }
+    
+    final void setArray(Object[] a) {
+        array = a;
+    }
+}
+#+END_SRC 
+
+#+BEGIN_SRC java
+public class Test {
+   public staic void main(String args[]) {
+       CopyOnWriteArrayList queue = new CopyOnWriteArrayList();
+       ValueObj v = new ValueObj();
+       queue.set(0, v);  // 首次放入
+       v.setX(10);
+       queue.set(0, v);  // 第二次放入, 但修改了x值
+   }
+}
+class ValueObj {
+   int x;
+   // getX/setX....
+} 
+#+END_SRC
+假设有另外一个线程在读queue, 下面分别分析第一次放入和第二次放入.
+1. 第一次放入
+   此时queue =[0]= = null, 走if分支.
+   根据volatile写规则, 读线程一定读到的是修改后的array.
+   根据线程内部(intra-thread)执行顺序规则, 修改array之前newElements =[0]= = v已经执行.
+   同理v的初始化在更早时刻完成.
+   最后根据顺序传递规则, 有:
+   #+begin_example
+v初始化--------------> newElements创建及修改 ---------------> 修改array --------------->读线程读array
+       Intra-thread规则                      Intra-thread规则            volatile写规则
+----------------------------------------顺序传递规则-----------------------------------------------
+   #+end_example
+2. 第二次放入
+   此时queue =[0]= = v, 走else分支.
+   如果else分支不执行setArray, 则1中的顺序的最后一环
+   
+这里我们只分析对volatile写这条规则的应用.
+set方法的else分支不需要替换数组元素, 但还是写了array这个volatile变量.
+由于volatile写happens-before随后的volatile读, 这个写就确保了当前线程执行完set后,
+其他线程随后的读都能读到最新的值. 如果没有这个volatile写, 其他读线程并不能保证读到最新的数据.
 * 实例
   读者可以参照上述思路尝试理解Java内存模型和intel的多核心内存模型.
   内存模型的描述可以从《Java language specification》 和 《intel develop manual》中找到.
-        
+      

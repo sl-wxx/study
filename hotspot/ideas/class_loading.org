@@ -17,8 +17,30 @@
    由系统类加载器(bootstrap, ext, app)加载, 而应用层面的类可以由用户自定义的类加载器加载.
 3. 类型安全
    发起加载的类加载器称为Initial classloader(loadClass), 而实际定义类的类加载器称为define 
-   classloader(defineClass), 这里记为DC.在JVM内部类型实际是由类名+DC一起决定的. 即:
+   classloader(defineClass). 这里分别记为IC和DC.在JVM内部类型实际是由类名+DC决定的. 即:
    相同类名但不同DC不是一种类型. 
+   假设类C1和C2都是父类P的子类, 而C1和C2没有相互引用.
+   1. 首先加载C1, 触发加载C1的classloader记为IC1, 实际定义C1的类加载器记为DC1.
+      事实上DC1是IC1的代理类加载器(父类加载器), 如果IC1没有使用代理则DC1==IC1.
+   2. C1关联了P, 所以会触发父类P加载. 此时ICP=IC1, DCP是IC1的代理.
+      如果IC1没有使用代理来加载P则DCP=IC1=ICP.
+      如果IC1使用了代理, 则DCP是IC1的代理类加载器. 
+      注意: 由于可能代理多次, 所以DCP不一定等于DC1.
+   3. 再加载C2, 由于C2和C1没有相互关联. 所以IC2/DC2可能和IC1/DC1没有任何关系
+   4. C2也会触发加载P, 由于P在加载C1时已经被创建, 此时有两个选择.
+      1. 使用已有的. 此时C1和C2都是P的子类, 引用P的位置可以自由的切换使用C1或C2.
+         这就要求IC2要把加载工作代理给DCP, 即由C1和C2触发加载最终产生了同一份P: <P, DCP>.
+         这可以通过让IC1和IC2都把DCP做为父类加载器, 同时在加载P时都代理给DCP来实现.
+      2. 自己重新定义一份P: <P, DCP'>
+         此时<P, DCP>和<P, DCP'>是两种完全不同的类型, 也没有任何关系.
+         C1是<P, DCP>的子类, 而C2是<P, DCP'>的子类, C1和C2也没有任何关系.
+         源码中引用P的位置, 也会被严格区分为引用<P, DCP>和引用<P, DCP'>两种情况.
+         这可以实现在运行时为同一个类名的类生成多个副本. 
+         比如一个Tomcat上部署了2个war包, 其中一个war包要有commoms-pool的老版本(为了稳定), 
+         而另一个war包要有最新版本(要用新的feature), 就可以通过这种方式解决.
+         事实上Tomcat的webapp class loader就采用了这样的思路来隔离不同的web应用.
+         另外一个应用是热替换, 参见demo.
+
 ** Linking
 Linking a class or interface involves verifying and preparing that class or interface,
 its direct superclass, its direct superinterfaces, and its element type (if it is an array

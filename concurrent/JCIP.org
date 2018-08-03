@@ -1,0 +1,122 @@
+* Thread Safety
+如果一个类的size方法在单线程环境下总是返回精确的当前元素数. 
+在多线程环境有可能在实际元素数是10的情况下返回8, 这个类是线程安全的吗?
+事实上ConcurrentHashMap就会表现出这样的行为. 
+如果要分析一段代码的正确性, 首先要确定这段代码承诺了什么, 然后分析它的行为是否违背了它的承诺.
+以ConcurrentHashMap为例, 事实上它的size方法并没有承诺返回精确的当前元素数, 所以它是线程安全的.
+线程不安全通常指: 一段代码在多线程环境下会违背其承诺.
+可能引起线程不安全的点:
+1. 内存可见性: 乱序执行, 缓存
+2. word tearing: long/double类型可能出现读到新值和旧值各一半
+3. race condition.
+
+* 可重入锁(ReentrantLock)
+When a thread requests a lock that is already held by another thread, the requesting thread blocks. 
+But because intrinsic locks are reentrant, if a thread tries to acquire a lock that it already 
+holds, the request succeeds. Reentrancy means that locks are acquired on a per-thread rather than 
+per-invocation basis. Reentrancy is implemented by associating with each lock an acquisition count 
+and an owning thread. When the count is zero, the lock is considered unheld. When a thread acquires 
+a previously unheld lock, the JVM records the owner and sets the acquisition count to one. If that 
+same thread acquires the lock again, the count is incremented, and when the owning thread exits the 
+synchronized block, the count is decremented. When the count reaches zero, the lock is released.
+
+* sharing objects
+** Immutability
+An object is immutable if: 
+    1. Its state cannot be modified after construction; 
+    2. All its fields are  final; 
+    3. It is properly constructed (the  this  reference does not escape during construction). 
+
+This  combination  of  an  immutable  holder  object  for 
+multiple  state  variables  related  by  an  invariant,  and  a  volatile  reference  used  to  ensure  its  timely  visibility,  allows 
+VolatileCachedFactorizer  to be threadͲsafe even though it does no explicit locking. 
+** Safe Publication
+To  publish  an  object  safely,  both  the  reference  to  the  object  and  the  object's  state  must  be  made  visible  to  other 
+threads at the same time. A properly constructed object can be safely published by: 
+    1. Initializing an object reference from a static initializer; 
+    2. Storing a reference to it into a  volatile  field or  AtomicReference ; 
+    3. Storing a reference to it into a  final  field of a properly constructed object; or 
+    4. Storing a reference to it into a field that is properly guarded by a lock. 
+** Thread Confinement
+1. threadlocal
+2. pool
+3. Only one thread can modify volatile variables.
+4. Stack confinement
+* Composing Object
+
+* 锁优化
+锁优化的核心在于减少竞争, 可以从逻辑和数据两个方面进行优化.(加锁不慢, 慢的是锁竞争)
+以网站计数器场景为例, 最直接的思路是用锁将操作计数器变量的代码保护起来, 如下:
+#+BEGIN_SRC java
+long counter = 0;
+
+public void increment() {
+   synchronized(this) {
+      int tmp = counter + 1;
+      counter = tmp;
+   }
+}
+#+END_SRC
+
+1. 从逻辑上优化
+   上面的代码把计算新counter和修改counter都保护起来了. 
+   如果计算新counter比较耗时, 就会引起明显的额外竞争.
+   这里我们把计算过程移出保护块. (事实上, 这就是AtomicLong的做法)
+#+BEGIN_SRC java
+volatile long counter = 0;
+
+public void increment() {
+   long v;
+   do {
+       v = counter;
+       v = v + 1;
+   } while (!compareAndSwapLong(counter, v));
+}
+#+END_SRC
+
+2. 从数据上优化
+   这里先根据请求参数将请求分类, 每一类请求对应一个单独的锁.
+   这样如果原来总的竞争数是S, 那么现在的竞争数大约是S/N(N为分类数).
+   当然这里会由一个问题: 如果sum和increment同时调用, 会导致sum返回的不是精确值.
+   事实上LongAdder以及ConcurrentHashMap的分桶位加锁都是类似的思路.
+#+BEGIN_SRC java
+long counters[] = {0, 0, 0};
+Object locks[] = {new Object(), new Object(), new Object()};
+
+public void increment() {
+   int randomValue = computeRandomValue(Thread.current());
+   int remainder = randomValue % 3;
+   synchronized (locks[remainder]) {
+      counters[remainder] ++;
+   } 
+}
+
+public long sum() {
+   long ret = 0;
+   for(int i=0; i<3; i++) {
+      synchronized (locks[i]) {
+         ret += counters[i];
+      }
+   } 
+   return ret;
+}
+#+END_SRC   
+
+** Tips
+1. 性能常常和简单是矛盾的, 但是要避免过早优化.
+2. 避免在持有锁的情况下调用耗时的方法, 如网络/IO操作等.
+3. Locking can guarantee both visibility and atomicity; 
+   volatile variables can only guarantee visibility.
+4. use volatile only when: 
+   Writes  to  the  variable  do  not  depend  on  its  current  value,  
+   or  you  can  ensure  that  only  a  single  thread  ever updates the value.
+5. Do not allow the  this  reference to escape during construction.
+6. The design process for a threadͲsafe class should include these three basic elements: 
+   1. Identify the variables that form the object's state; 
+   2. Identify the invariants that constrain the state variables; 
+   3. Establish a policy for managing concurrent access to the object's state.
+7. You cannot ensure thread safety without understanding an object's invariants and postͲconditions. 
+   Constraints on the valid values or state transitions for state variables can create atomicity and 
+   encapsulation requirements.
+8. Document a class's thread safety guarantees for its clients; document its synchronization policy 
+   for its maintainers.
