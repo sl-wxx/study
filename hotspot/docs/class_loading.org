@@ -1,0 +1,86 @@
+* 概述
+1. Loading is the process of finding the binary representation of a class
+   or interface type with a particular name and creating a class or interface from
+   that binary representation.
+2. Linking is the process of taking a class or interface and combining it 
+   into the run-time state of the Java Virtual Machine so that it can be executed.
+3. Initialization of a class or interface consists of executing the class or
+   interface initialization method <clinit>.
+
+** Loading
+1. 关联加载
+   加载某个类时会同时加载其常量池中引用的所有其他类, 这些被被关联的类又会加载其各自关联的类.
+   所以加载一个类可能会递归触发加载很多类.
+2. 代理
+   如果每个类加载器都独自加载所有关联类, 显然会造成重复.所以为每个类加载器都指定一个父类加载器, 
+   子类加载器可以指定由其父类加载器加载某些类.这样就形成了一个层级, 底层的类(Object, String)等
+   由系统类加载器(bootstrap, ext, app)加载, 而应用层面的类可以由用户自定义的类加载器加载.
+3. 类型安全
+   发起加载的类加载器称为Initial classloader(loadClass), 而实际定义类的类加载器称为define 
+   classloader(defineClass). 这里分别记为IC和DC.在JVM内部类型实际是由类名+DC决定的. 即:
+   相同类名但不同DC不是一种类型. 
+   假设类C1和C2都是父类P的子类, 而C1和C2没有相互引用.
+   1. 首先加载C1, 触发加载C1的classloader记为IC1, 实际定义C1的类加载器记为DC1.
+      事实上DC1是IC1的代理类加载器(父类加载器), 如果IC1没有使用代理则DC1==IC1.
+   2. C1关联了P, 所以会触发父类P加载. 此时ICP=IC1, DCP是IC1的代理.
+      如果IC1没有使用代理来加载P则DCP=IC1=ICP.
+      如果IC1使用了代理, 则DCP是IC1的代理类加载器. 
+      注意: 由于可能代理多次, 所以DCP不一定等于DC1.
+   3. 再加载C2, 由于C2和C1没有相互关联. 所以IC2/DC2可能和IC1/DC1没有任何关系
+   4. C2也会触发加载P, 由于P在加载C1时已经被创建, 此时有两个选择.
+      1. 使用已有的. 此时C1和C2都是P的子类, 引用P的位置可以自由的切换使用C1或C2.
+         这就要求IC2要把加载工作代理给DCP, 即由C1和C2触发加载最终产生了同一份P: <P, DCP>.
+         这可以通过让IC1和IC2都把DCP做为父类加载器, 同时在加载P时都代理给DCP来实现.
+      2. 自己重新定义一份P: <P, DCP'>
+         此时<P, DCP>和<P, DCP'>是两种完全不同的类型, 也没有任何关系.
+         C1是<P, DCP>的子类, 而C2是<P, DCP'>的子类, C1和C2也没有任何关系.
+         源码中引用P的位置, 也会被严格区分为引用<P, DCP>和引用<P, DCP'>两种情况.
+         这可以实现在运行时为同一个类名的类生成多个副本. 
+         比如一个Tomcat上部署了2个war包, 其中一个war包要有commoms-pool的老版本(为了稳定), 
+         而另一个war包要有最新版本(要用新的feature), 就可以通过这种方式解决.
+         事实上Tomcat的webapp class loader就采用了这样的思路来隔离不同的web应用.
+         另外一个应用是热替换, 参见demo.
+
+** Linking
+Linking a class or interface involves verifying and preparing that class or interface,
+its direct superclass, its direct superinterfaces, and its element type (if it is an array
+type), if necessary. Resolution of symbolic references in the class or interface is
+an optional part of linking.
+1. Verification
+   ensures that the binary representation of a class or interface is structurally correct.
+   Verification may cause additional classes and interfaces to be loaded but need not 
+   cause them to be verified or prepared.
+2. Preparation
+   involves creating the static fields for a class or interface and initializing
+   such fields to their default values.
+3. Resolution
+   The Java Virtual Machine instructions anewarray, checkcast, getfield, getstatic, instanceof,
+   invokedynamic, invokeinterface, invokespecial, invokestatic, invokevirtual, ldc, ldc_w,
+   multianewarray, new, putfield, and putstatic make symbolic references to the run-time constant
+   pool. Execution of any of these instructions requires resolution of its symbolic reference.
+
+** Initialization
+Initialization of a class or interface consists of executing its class or interface initialization
+method.
+
+A class or interface C may be initialized only as a result of:
+1. If C is a class, its designation as the initial class at Java Virtual Machine startup. (main 方法)
+2. If C is a class, the initialization of one of its subclasses.
+3. If C is an interface that declares a non- abstract , non- static method, the
+   initialization of a class that implements C directly or indirectly.
+4. Invocation of certain reflective methods in the class library (§2.12), for example,
+   in class Class or in package java.lang.reflect
+5. The execution of any one of the Java Virtual Machine instructions new,
+   getstatic, putstatic, or invokestatic that references C (§new, §getstatic, §putstatic,
+   §invokestatic). These instructions reference a class or interface directly or
+   indirectly through either a field reference or a method reference.
+6. The first invocation of a java.lang.invoke.MethodHandle instance which
+   was the result of method handle resolution (§5.4.3.5) for a method handle
+   of kind 2 ( REF_getStatic ), 4 ( REF_putStatic ), 6 ( REF_invokeStatic ), or 8
+   ( REF_newInvokeSpecial ).
+
+* 热替换简单实现
+1. 对需要替换的类定义一个接口, 并由BaseClassloader加载该接口及该接口的参数和返回类型.
+2. 自定义类加载器定义替换类, 并将替换类引用的所有其他类代理给BaseClassloader加载, 
+   以保证类型兼容.
+3. demo参见: https://github.com/sl-wxx/java_class_loader
