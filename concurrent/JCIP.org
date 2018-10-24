@@ -43,6 +43,32 @@ threads at the same time. A properly constructed object can be safely published 
 3. Only one thread can modify volatile variables.
 4. Stack confinement
 * Composing Object
+* Building Blocks
+ConcurrentHashMap
+CopyOnWriteArrayList
+ArrayBlockingQueue/LinkedBlockingQueue/PriorityBlockingQueue/SynchronousQueue
+Deque: work stealing
+CountDownLatch/
+CyclicBarrier/Exchanger
+FutureTask/
+Semaphore/
+
+* Liveness Hazards 
+** Deadlock
+1. lock order
+2. open call
+   Calling a method with no locks held is called an open call
+3. timed lock attempts
+** starvation
+Starvation occurs when a thread is perpetually denied access to resources it needs in order to make progress
+1. CPU cycles: thread priority
+** live lock
+Livelock is a form of liveness failure in which a thread, while not blocked, still cannot make 
+progress because it keeps retrying  an  operation  that  will  always  fail.
+1. MQ ack
+2. introduce some randomness
+
+* Performance and Scalability
 
 * 锁优化
 锁优化的核心在于减少竞争, 可以从逻辑和数据两个方面进行优化.(加锁不慢, 慢的是锁竞争)

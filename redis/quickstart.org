@@ -1,0 +1,77 @@
+* basic commands
+1. select: databases are simply identified by a number with the default database being number 0
+2. exists/del/type
+3. expire/persist/ttl/pexpire/pttl
+4. keys [pattern]
+5. info
+* data types
+** string
+1. set key value [EX seconds] [PX milliseconds] [NX|XX]
+2. get [key]
+3. incr/incrby/decr/decrby
+4. getset key value
+5. mget key [key ...]
+6. mset key value [key value ...]
+** lists: linkedlist
+llen/lpush/rpush/lrange/rpop/lpop/ltrim/brpop/blpop/(B)RPOPLPUSH
+** hash
+hmset/hget/hmget/hgetall/hincrby
+** Set
+sadd/smembers/sismember/sinter/spop/sunionstore/scard/srandommember
+** Sorted Set
+Sorted sets are implemented via a dual-ported data structure containing both 
+a skip list and a hash table, so every time we add an element Redis performs 
+an O(log(N)) operation. That's good, but when we ask for sorted elements 
+Redis does not have to do any work at all, it's already all sorted.
+
+1. zadd/zrange/zrevrange/ZRANGEBYSCORE/zremrangebyscore/zrank/zrevrank
+2. ZRANGEBYLEX, ZREVRANGEBYLEX, ZREMRANGEBYLEX and ZLEXCOUNT
+** Bitmaps
+setbit/getbit/bitop/bitcount/bitpos/
+** HyperLogLogs
+pfadd/pfcount/pfmerge
+
+* Iterate key space
+1. scan [cursor] [MATCH pattern] [COUNT count]
+2. sscan/hscan/zscan
+* Pub-Sub server
+publish/subscribe/psubscribe
+* Pipeline: batch process
+* Redis scripting: Lua
+EVAL/EVALSHA
+* Memory optimization
+1. Special encoding of small aggregate data types
+   #+begin_example
+hash-max-zipmap-entries 512 (hash-max-ziplist-entries for Redis >= 2.6)
+hash-max-zipmap-value 64  (hash-max-ziplist-value for Redis >= 2.6)
+list-max-ziplist-entries 512
+list-max-ziplist-value 64
+zset-max-ziplist-entries 128
+zset-max-ziplist-value 64
+set-max-intset-entries 512
+   #+end_example
+2. Using 32 bit instances
+   pointers are small, but such an instance will be limited to 4 GB of maximum memory usage
+3. Bit and byte level operations
+4. Use hashes when possible
+   implicit pre-sharding
+* LRU/LFU Cache
+noeviction/allkeys-lru/volatile-lru/allkeys-random/volatile-random/volatile-ttl
+* Transactions
+1. multi/exec/discard/
+2. watch/unwatch
+3. A Redis script is transactional by definition
+* Partitioning
+** algorithm
+1. range partitioning
+2. hash partitioning
+3. consistent hashing
+** implementation
+1. Client side partitioning
+2. Proxy assisted partitioning
+3. Query routing
+** disadvantage
+1. Operations involving multiple keys are usually not supported
+2. Redis transactions involving multiple keys can not be used.
+3. The partitioning granularity is the key, so it is not possible to shard a dataset with a single huge key like a very big sorted set
+4. 

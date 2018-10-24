@@ -1,0 +1,41 @@
+* ContextLoaderListener
+1. 是一个Servlet的listener
+2. 实际功能代理给ContextLoader
+
+* BeanFactory
+#+BEGIN_SRC java
+public interface BeanFactory {
+
+	String FACTORY_BEAN_PREFIX = "&";
+
+	Object getBean(String name) throws BeansException;
+
+	<T> T getBean(String name, Class<T> requiredType) throws BeansException;
+
+	<T> T getBean(Class<T> requiredType) throws BeansException;
+
+	Object getBean(String name, Object... args) throws BeansException;
+
+	<T> T getBean(Class<T> requiredType, Object... args) throws BeansException;
+
+	boolean containsBean(String name);
+
+	boolean isSingleton(String name) throws NoSuchBeanDefinitionException;
+
+	boolean isPrototype(String name) throws NoSuchBeanDefinitionException;
+
+	boolean isTypeMatch(String name, ResolvableType typeToMatch) throws NoSuchBeanDefinitionException;
+
+	Class<?> getType(String name) throws NoSuchBeanDefinitionException;
+
+	String[] getAliases(String name);
+
+}
+#+END_SRC
+** inandk
+1. ian
+2. iandf
+   1. kandkf
+      1. kandk
+   2. kandf
+3. aknf

@@ -1,0 +1,9 @@
+#+BEGIN_SRC c++
+#define WK_KLASS_DECLARE(name, symbol, option) \
+    static Klass* name() { return check_klass_##option(_well_known_klasses[WK_KLASS_ENUM_NAME(name)]); } \
+    static Klass** name##_addr() {                                                                       \
+      return &SystemDictionary::_well_known_klasses[SystemDictionary::WK_KLASS_ENUM_NAME(name)];           \
+    }
+  WK_KLASSES_DO(WK_KLASS_DECLARE);
+  #undef WK_KLASS_DECLARE
+#+END_SRC

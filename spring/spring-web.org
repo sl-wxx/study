@@ -88,20 +88,32 @@ DispatcherServlet 会在初始化时创建自己的appServlet WebApplicationCont
   Page 527 ？？？
 
 1. 请求进来 DispatcherServlet --> doService() --> doDispatcher()
-2. 通过预先注册的handlerMappings获取到HandlerExecutionChain(包含handlerMethod和handlerInterceptors)
-3. 根据2中找到的handlerMethod，在预先注册的handlerAdaptors中找到可用的handlerAdaptor
+2. 遍历预先注册的handlerMappings获取到HandlerExecutionChain
+   1. requestMapping用于查找处理请求需要执行的方法.
+      如: RequestMappingHandlerMapping用于处理@RequestMapping, SimpleUrlHandlerMapping用于静态资源(mvc:resources)
+   2. HandlerExecutionChain包含handler和handlerInterceptors.
+      对应@RequestMapping的handler是HandlerMethod类型, 它底层保存了相应的Controller及处理请求的方法(RegisterController.register())
+3. 根据找到的handlerMethod，在预先注册的handlerAdaptors中找到可用的handlerAdaptor(RequestMappingHandlerAdaptor)
 4. 先执行HandlerExecutionChain中的handlerInterceptors的preHandle方法
-5. 调用3中的handlerAdaptor
+   handlerInterpreter用于注册一些辅助处理的bean, 如ConversionService
+5. 由handlerAdaptor调用实际的Controller方法, 并返回ModelAndView
    + 解析请求参数
-6. 
+   + 调用Controller方法(如: RegisterController.register())
+   + returnValueHandler处理返回值
+     如: RequestResponseBodyMethodProcessor用于处理带@ResponseBody注解的方法的返回值
+6. 再执行HandlerExecutionChain中的handlerInterceptors的postHandle方法
+7. 为返回结果生成view
+   1. 如果处理中发生异常, 遍历handlerExceptionResolvers并调用其resolveException方法生成ModelAndView
+   2. 如果没有异常
+      1. 如果5中返回的ModelAndView不为空, 使用viewResolver生成view
+      2. 如果为空, 认为请求已处理, 不再处理. (使用@ResponseBody时, 会进入该分支)
+8. 最后触发HandlerExecutionChain中的handlerInterceptors的afterCompletion方法
 
-
-
-1. rabbitMQ默认是单线程处理的 为什么？
-2. spring 基于代理的事务 具体如何实现的？
-3. spring 第8章 校验 转换相关
-5. spring 静态资源缓存及版本
-6. servlet api 重新温习
+9. rabbitMQ默认是单线程处理的 为什么？
+10. spring 基于代理的事务 具体如何实现的？
+11. spring 第8章 校验 转换相关
+12. spring 静态资源缓存及版本
+13. servlet api 重新温习
 
 
 

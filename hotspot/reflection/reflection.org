@@ -1,0 +1,4 @@
+reflect_DelegatingClassLoader_klass
+反射可能会涉及使用新的classloader, 但为了保证type safety 使用reflect_DelegatingClassLoader_klass
+参见: /home/lisp/src/openjdk8u60/hotspot/src/share/vm/classfile/javaClasses.cpp
+      systemDictionary.cpp: 613

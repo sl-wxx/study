@@ -1,3 +1,10 @@
+1. initialize_class
+   1. SystemDictionary::resolve_or_fail
+      1. resolve_or_null
+         1. resolve_array_class_or_null
+         2. resolve_instance_class_or_null
+         3. 
+
 #+BEGIN_SRC c++
 initialize_class(vmSymbols::java_lang_String(), CHECK_0);
 
